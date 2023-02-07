@@ -1,0 +1,7 @@
+[
+{
+  "directory": "/home/rlafage/workspace/slsqp/build",
+  "command": "/usr/bin/cc  -I/home/rlafage/workspace/slsqp/slsqp    -o CMakeFiles/slsqp.dir/slsqp.c.o   -c /home/rlafage/workspace/slsqp/slsqp/slsqp.c",
+  "file": "/home/rlafage/workspace/slsqp/slsqp/slsqp.c"
+}
+]
