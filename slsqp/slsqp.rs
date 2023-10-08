@@ -1,47 +1,44 @@
 #![allow(dead_code, mutable_transmutes, non_camel_case_types, non_snake_case, non_upper_case_globals, unused_assignments, unused_mut)]
 #![register_tool(c2rust)]
-#![feature(register_tool)]
+#![feature(c_variadic, register_tool)]
 extern "C" {
     fn sqrt(_: libc::c_double) -> libc::c_double;
     fn fabs(_: libc::c_double) -> libc::c_double;
     fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
+    fn realloc(_: *mut libc::c_void, _: libc::c_ulong) -> *mut libc::c_void;
     fn free(__ptr: *mut libc::c_void);
+    fn abort() -> !;
     fn memcpy(
         _: *mut libc::c_void,
         _: *const libc::c_void,
         _: libc::c_ulong,
     ) -> *mut libc::c_void;
-    fn nlopt_isinf(x: libc::c_double) -> libc::c_int;
-    fn nlopt_isfinite(x: libc::c_double) -> libc::c_int;
-    fn nlopt_stop_evals(stop: *const nlopt_stopping) -> libc::c_int;
-    fn nlopt_stop_time(stop: *const nlopt_stopping) -> libc::c_int;
-    fn nlopt_stop_forced(stop: *const nlopt_stopping) -> libc::c_int;
-    fn nlopt_stop_msg(s: *const nlopt_stopping, format: *const libc::c_char, _: ...);
-    fn nlopt_count_constraints(
-        p: libc::c_uint,
-        c: *const nlopt_constraint,
-    ) -> libc::c_uint;
-    fn nlopt_max_constraint_dim(
-        p: libc::c_uint,
-        c: *const nlopt_constraint,
-    ) -> libc::c_uint;
-    fn nlopt_eval_constraint(
-        result: *mut libc::c_double,
-        grad: *mut libc::c_double,
-        c: *const nlopt_constraint,
-        n: libc::c_uint,
-        x: *const libc::c_double,
-    );
-    fn nlopt_stop_ftol(
-        stop: *const nlopt_stopping,
-        f: libc::c_double,
-        oldf: libc::c_double,
+    fn strlen(_: *const libc::c_char) -> libc::c_ulong;
+    fn gettimeofday(__tv: *mut timeval, __tz: *mut libc::c_void) -> libc::c_int;
+    fn vsnprintf(
+        _: *mut libc::c_char,
+        _: libc::c_ulong,
+        _: *const libc::c_char,
+        _: ::std::ffi::VaList,
     ) -> libc::c_int;
-    fn nlopt_stop_x(
-        stop: *const nlopt_stopping,
-        x: *const libc::c_double,
-        oldx: *const libc::c_double,
-    ) -> libc::c_int;
+}
+pub type __builtin_va_list = [__va_list_tag; 1];
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct __va_list_tag {
+    pub gp_offset: libc::c_uint,
+    pub fp_offset: libc::c_uint,
+    pub overflow_arg_area: *mut libc::c_void,
+    pub reg_save_area: *mut libc::c_void,
+}
+pub type __time_t = libc::c_long;
+pub type __suseconds_t = libc::c_long;
+pub type size_t = libc::c_ulong;
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct timeval {
+    pub tv_sec: __time_t,
+    pub tv_usec: __suseconds_t,
 }
 pub type nlopt_func = Option::<
     unsafe extern "C" fn(
@@ -84,6 +81,7 @@ pub const NLOPT_ROUNDOFF_LIMITED: nlopt_result = -4;
 pub const NLOPT_OUT_OF_MEMORY: nlopt_result = -3;
 pub const NLOPT_INVALID_ARGS: nlopt_result = -2;
 pub const NLOPT_FAILURE: nlopt_result = -1;
+pub type va_list = __builtin_va_list;
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct nlopt_stopping {
@@ -133,6 +131,556 @@ pub struct slsqpb_state {
     pub ireset: libc::c_int,
     pub itermx: libc::c_int,
     pub x0: *mut libc::c_double,
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_seconds() -> libc::c_double {
+    static mut start_inited: libc::c_int = 0 as libc::c_int;
+    static mut start: timeval = timeval { tv_sec: 0, tv_usec: 0 };
+    let mut tv: timeval = timeval { tv_sec: 0, tv_usec: 0 };
+    if start_inited == 0 {
+        start_inited = 1 as libc::c_int;
+        gettimeofday(&mut start, 0 as *mut libc::c_void);
+    }
+    gettimeofday(&mut tv, 0 as *mut libc::c_void);
+    return (tv.tv_sec - start.tv_sec) as libc::c_double
+        + 1.0e-6f64 * (tv.tv_usec - start.tv_usec) as libc::c_double;
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_time_seed() -> libc::c_ulong {
+    let mut tv: timeval = timeval { tv_sec: 0, tv_usec: 0 };
+    gettimeofday(&mut tv, 0 as *mut libc::c_void);
+    return (tv.tv_sec ^ tv.tv_usec) as libc::c_ulong;
+}
+unsafe extern "C" fn sc(
+    mut x: libc::c_double,
+    mut smin: libc::c_double,
+    mut smax: libc::c_double,
+) -> libc::c_double {
+    return smin + x * (smax - smin);
+}
+unsafe extern "C" fn vector_norm(
+    mut n: libc::c_uint,
+    mut vec: *const libc::c_double,
+    mut w: *const libc::c_double,
+    mut scale_min: *const libc::c_double,
+    mut scale_max: *const libc::c_double,
+) -> libc::c_double {
+    let mut i: libc::c_uint = 0;
+    let mut ret: libc::c_double = 0 as libc::c_int as libc::c_double;
+    if !scale_min.is_null() && !scale_max.is_null() {
+        if !w.is_null() {
+            i = 0 as libc::c_int as libc::c_uint;
+            while i < n {
+                ret
+                    += *w.offset(i as isize)
+                        * fabs(
+                            sc(
+                                *vec.offset(i as isize),
+                                *scale_min.offset(i as isize),
+                                *scale_max.offset(i as isize),
+                            ),
+                        );
+                i = i.wrapping_add(1);
+            }
+        } else {
+            i = 0 as libc::c_int as libc::c_uint;
+            while i < n {
+                ret
+                    += fabs(
+                        sc(
+                            *vec.offset(i as isize),
+                            *scale_min.offset(i as isize),
+                            *scale_max.offset(i as isize),
+                        ),
+                    );
+                i = i.wrapping_add(1);
+            }
+        }
+    } else if !w.is_null() {
+        i = 0 as libc::c_int as libc::c_uint;
+        while i < n {
+            ret += *w.offset(i as isize) * fabs(*vec.offset(i as isize));
+            i = i.wrapping_add(1);
+        }
+    } else {
+        i = 0 as libc::c_int as libc::c_uint;
+        while i < n {
+            ret += fabs(*vec.offset(i as isize));
+            i = i.wrapping_add(1);
+        }
+    }
+    return ret;
+}
+unsafe extern "C" fn diff_norm(
+    mut n: libc::c_uint,
+    mut x: *const libc::c_double,
+    mut oldx: *const libc::c_double,
+    mut w: *const libc::c_double,
+    mut scale_min: *const libc::c_double,
+    mut scale_max: *const libc::c_double,
+) -> libc::c_double {
+    let mut i: libc::c_uint = 0;
+    let mut ret: libc::c_double = 0 as libc::c_int as libc::c_double;
+    if !scale_min.is_null() && !scale_max.is_null() {
+        if !w.is_null() {
+            i = 0 as libc::c_int as libc::c_uint;
+            while i < n {
+                ret
+                    += *w.offset(i as isize)
+                        * fabs(
+                            sc(
+                                *x.offset(i as isize),
+                                *scale_min.offset(i as isize),
+                                *scale_max.offset(i as isize),
+                            )
+                                - sc(
+                                    *oldx.offset(i as isize),
+                                    *scale_min.offset(i as isize),
+                                    *scale_max.offset(i as isize),
+                                ),
+                        );
+                i = i.wrapping_add(1);
+            }
+        } else {
+            i = 0 as libc::c_int as libc::c_uint;
+            while i < n {
+                ret
+                    += fabs(
+                        sc(
+                            *x.offset(i as isize),
+                            *scale_min.offset(i as isize),
+                            *scale_max.offset(i as isize),
+                        )
+                            - sc(
+                                *oldx.offset(i as isize),
+                                *scale_min.offset(i as isize),
+                                *scale_max.offset(i as isize),
+                            ),
+                    );
+                i = i.wrapping_add(1);
+            }
+        }
+    } else if !w.is_null() {
+        i = 0 as libc::c_int as libc::c_uint;
+        while i < n {
+            ret
+                += *w.offset(i as isize)
+                    * fabs(*x.offset(i as isize) - *oldx.offset(i as isize));
+            i = i.wrapping_add(1);
+        }
+    } else {
+        i = 0 as libc::c_int as libc::c_uint;
+        while i < n {
+            ret += fabs(*x.offset(i as isize) - *oldx.offset(i as isize));
+            i = i.wrapping_add(1);
+        }
+    }
+    return ret;
+}
+unsafe extern "C" fn relstop(
+    mut vold: libc::c_double,
+    mut vnew: libc::c_double,
+    mut reltol: libc::c_double,
+    mut abstol: libc::c_double,
+) -> libc::c_int {
+    if nlopt_isinf(vold) != 0 {
+        return 0 as libc::c_int;
+    }
+    return (fabs(vnew - vold) < abstol
+        || fabs(vnew - vold) < reltol * (fabs(vnew) + fabs(vold)) * 0.5f64
+        || reltol > 0 as libc::c_int as libc::c_double && vnew == vold) as libc::c_int;
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_stop_ftol(
+    mut s: *const nlopt_stopping,
+    mut f: libc::c_double,
+    mut oldf: libc::c_double,
+) -> libc::c_int {
+    return relstop(oldf, f, (*s).ftol_rel, (*s).ftol_abs);
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_stop_f(
+    mut s: *const nlopt_stopping,
+    mut f: libc::c_double,
+    mut oldf: libc::c_double,
+) -> libc::c_int {
+    return (f <= (*s).minf_max || nlopt_stop_ftol(s, f, oldf) != 0) as libc::c_int;
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_stop_x(
+    mut s: *const nlopt_stopping,
+    mut x: *const libc::c_double,
+    mut oldx: *const libc::c_double,
+) -> libc::c_int {
+    let mut i: libc::c_uint = 0;
+    if diff_norm(
+        (*s).n,
+        x,
+        oldx,
+        (*s).x_weights,
+        0 as *const libc::c_double,
+        0 as *const libc::c_double,
+    )
+        < (*s).xtol_rel
+            * vector_norm(
+                (*s).n,
+                x,
+                (*s).x_weights,
+                0 as *const libc::c_double,
+                0 as *const libc::c_double,
+            )
+    {
+        return 1 as libc::c_int;
+    }
+    if ((*s).xtol_abs).is_null() {
+        return 0 as libc::c_int;
+    }
+    i = 0 as libc::c_int as libc::c_uint;
+    while i < (*s).n {
+        if fabs(*x.offset(i as isize) - *oldx.offset(i as isize))
+            >= *((*s).xtol_abs).offset(i as isize)
+        {
+            return 0 as libc::c_int;
+        }
+        i = i.wrapping_add(1);
+    }
+    return 1 as libc::c_int;
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_stop_dx(
+    mut s: *const nlopt_stopping,
+    mut x: *const libc::c_double,
+    mut dx: *const libc::c_double,
+) -> libc::c_int {
+    let mut i: libc::c_uint = 0;
+    if vector_norm(
+        (*s).n,
+        dx,
+        (*s).x_weights,
+        0 as *const libc::c_double,
+        0 as *const libc::c_double,
+    )
+        < (*s).xtol_rel
+            * vector_norm(
+                (*s).n,
+                x,
+                (*s).x_weights,
+                0 as *const libc::c_double,
+                0 as *const libc::c_double,
+            )
+    {
+        return 1 as libc::c_int;
+    }
+    if ((*s).xtol_abs).is_null() {
+        return 0 as libc::c_int;
+    }
+    i = 0 as libc::c_int as libc::c_uint;
+    while i < (*s).n {
+        if fabs(*dx.offset(i as isize)) >= *((*s).xtol_abs).offset(i as isize) {
+            return 0 as libc::c_int;
+        }
+        i = i.wrapping_add(1);
+    }
+    return 1 as libc::c_int;
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_stop_xs(
+    mut s: *const nlopt_stopping,
+    mut xs: *const libc::c_double,
+    mut oldxs: *const libc::c_double,
+    mut scale_min: *const libc::c_double,
+    mut scale_max: *const libc::c_double,
+) -> libc::c_int {
+    let mut i: libc::c_uint = 0;
+    if diff_norm((*s).n, xs, oldxs, (*s).x_weights, scale_min, scale_max)
+        < (*s).xtol_rel * vector_norm((*s).n, xs, (*s).x_weights, scale_min, scale_max)
+    {
+        return 1 as libc::c_int;
+    }
+    if ((*s).xtol_abs).is_null() {
+        return 0 as libc::c_int;
+    }
+    i = 0 as libc::c_int as libc::c_uint;
+    while i < (*s).n {
+        if fabs(
+            sc(
+                *xs.offset(i as isize),
+                *scale_min.offset(i as isize),
+                *scale_max.offset(i as isize),
+            )
+                - sc(
+                    *oldxs.offset(i as isize),
+                    *scale_min.offset(i as isize),
+                    *scale_max.offset(i as isize),
+                ),
+        ) >= *((*s).xtol_abs).offset(i as isize)
+        {
+            return 0 as libc::c_int;
+        }
+        i = i.wrapping_add(1);
+    }
+    return 1 as libc::c_int;
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_isfinite(mut x: libc::c_double) -> libc::c_int {
+    return (fabs(x) <= 1.7976931348623157e+308f64) as libc::c_int;
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_istiny(mut x: libc::c_double) -> libc::c_int {
+    if x == 0.0f64 {
+        return 1 as libc::c_int
+    } else {
+        return (fabs(x) < 2.2250738585072014e-308f64) as libc::c_int
+    };
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_isnan(mut x: libc::c_double) -> libc::c_int {
+    return x.is_nan() as i32;
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_stop_evals(mut s: *const nlopt_stopping) -> libc::c_int {
+    return ((*s).maxeval > 0 as libc::c_int && *(*s).nevals_p >= (*s).maxeval)
+        as libc::c_int;
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_stop_time_(
+    mut start: libc::c_double,
+    mut maxtime: libc::c_double,
+) -> libc::c_int {
+    return (maxtime > 0 as libc::c_int as libc::c_double
+        && nlopt_seconds() - start >= maxtime) as libc::c_int;
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_stop_time(mut s: *const nlopt_stopping) -> libc::c_int {
+    return nlopt_stop_time_((*s).start, (*s).maxtime);
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_stop_evalstime(
+    mut stop: *const nlopt_stopping,
+) -> libc::c_int {
+    return (nlopt_stop_evals(stop) != 0 || nlopt_stop_time(stop) != 0) as libc::c_int;
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_stop_forced(
+    mut stop: *const nlopt_stopping,
+) -> libc::c_int {
+    return (!((*stop).force_stop).is_null() && *(*stop).force_stop != 0) as libc::c_int;
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_vsprintf(
+    mut p: *mut libc::c_char,
+    mut format: *const libc::c_char,
+    mut ap: ::std::ffi::VaList,
+) -> *mut libc::c_char {
+    let mut len: size_t = (strlen(format))
+        .wrapping_add(128 as libc::c_int as libc::c_ulong);
+    let mut ret: libc::c_int = 0;
+    p = realloc(p as *mut libc::c_void, len) as *mut libc::c_char;
+    if p.is_null() {
+        abort();
+    }
+    loop {
+        ret = vsnprintf(p, len, format, ap.as_va_list());
+        if !(ret < 0 as libc::c_int || ret as size_t >= len) {
+            break;
+        }
+        len = if ret >= 0 as libc::c_int {
+            (ret + 1 as libc::c_int) as size_t
+        } else {
+            len.wrapping_mul(3 as libc::c_int as libc::c_ulong) >> 1 as libc::c_int
+        };
+        p = realloc(p as *mut libc::c_void, len) as *mut libc::c_char;
+        if p.is_null() {
+            abort();
+        }
+    }
+    return p;
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_stop_msg(
+    mut s: *const nlopt_stopping,
+    mut format: *const libc::c_char,
+    mut args: ...
+) {
+    let mut ap: ::std::ffi::VaListImpl;
+    if !((*s).stop_msg).is_null() {
+        ap = args.clone();
+        let ref mut fresh0 = *(*s).stop_msg;
+        *fresh0 = nlopt_vsprintf(*(*s).stop_msg, format, ap.as_va_list());
+    }
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_count_constraints(
+    mut p: libc::c_uint,
+    mut c: *const nlopt_constraint,
+) -> libc::c_uint {
+    let mut i: libc::c_uint = 0;
+    let mut count: libc::c_uint = 0 as libc::c_int as libc::c_uint;
+    i = 0 as libc::c_int as libc::c_uint;
+    while i < p {
+        count = count.wrapping_add((*c.offset(i as isize)).m);
+        i = i.wrapping_add(1);
+    }
+    return count;
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_max_constraint_dim(
+    mut p: libc::c_uint,
+    mut c: *const nlopt_constraint,
+) -> libc::c_uint {
+    let mut i: libc::c_uint = 0;
+    let mut max_dim: libc::c_uint = 0 as libc::c_int as libc::c_uint;
+    i = 0 as libc::c_int as libc::c_uint;
+    while i < p {
+        if (*c.offset(i as isize)).m > max_dim {
+            max_dim = (*c.offset(i as isize)).m;
+        }
+        i = i.wrapping_add(1);
+    }
+    return max_dim;
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_eval_constraint(
+    mut result: *mut libc::c_double,
+    mut grad: *mut libc::c_double,
+    mut c: *const nlopt_constraint,
+    mut n: libc::c_uint,
+    mut x: *const libc::c_double,
+) {
+    if ((*c).f).is_some() {
+        *result
+            .offset(
+                0 as libc::c_int as isize,
+            ) = ((*c).f).expect("non-null function pointer")(n, x, grad, (*c).f_data);
+    } else {
+        ((*c).mf)
+            .expect(
+                "non-null function pointer",
+            )((*c).m, result, n, x, grad, (*c).f_data);
+    };
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_isinf(mut x: libc::c_double) -> libc::c_int {
+    return (fabs(x) >= ::std::f64::INFINITY * 0.99f64
+        || if x.is_infinite() { if x.is_sign_positive() { 1 } else { -1 } } else { 0 }
+            != 0) as libc::c_int;
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_compute_rescaling(
+    mut n: libc::c_uint,
+    mut dx: *const libc::c_double,
+) -> *mut libc::c_double {
+    let mut s: *mut libc::c_double = malloc(
+        (::std::mem::size_of::<libc::c_double>() as libc::c_ulong)
+            .wrapping_mul(n as libc::c_ulong),
+    ) as *mut libc::c_double;
+    let mut i: libc::c_uint = 0;
+    if s.is_null() {
+        return 0 as *mut libc::c_double;
+    }
+    i = 0 as libc::c_int as libc::c_uint;
+    while i < n {
+        *s.offset(i as isize) = 1.0f64;
+        i = i.wrapping_add(1);
+    }
+    if n == 1 as libc::c_int as libc::c_uint {
+        return s;
+    }
+    i = 1 as libc::c_int as libc::c_uint;
+    while i < n
+        && *dx.offset(i as isize)
+            == *dx.offset(i.wrapping_sub(1 as libc::c_int as libc::c_uint) as isize)
+    {
+        i = i.wrapping_add(1);
+    }
+    if i < n {
+        i = 1 as libc::c_int as libc::c_uint;
+        while i < n {
+            *s
+                .offset(
+                    i as isize,
+                ) = *dx.offset(i as isize) / *dx.offset(0 as libc::c_int as isize);
+            i = i.wrapping_add(1);
+        }
+    }
+    return s;
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_rescale(
+    mut n: libc::c_uint,
+    mut s: *const libc::c_double,
+    mut x: *const libc::c_double,
+    mut xs: *mut libc::c_double,
+) {
+    let mut i: libc::c_uint = 0;
+    if s.is_null() {
+        i = 0 as libc::c_int as libc::c_uint;
+        while i < n {
+            *xs.offset(i as isize) = *x.offset(i as isize);
+            i = i.wrapping_add(1);
+        }
+    } else {
+        i = 0 as libc::c_int as libc::c_uint;
+        while i < n {
+            *xs.offset(i as isize) = *x.offset(i as isize) / *s.offset(i as isize);
+            i = i.wrapping_add(1);
+        }
+    };
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_unscale(
+    mut n: libc::c_uint,
+    mut s: *const libc::c_double,
+    mut x: *const libc::c_double,
+    mut xs: *mut libc::c_double,
+) {
+    let mut i: libc::c_uint = 0;
+    if s.is_null() {
+        i = 0 as libc::c_int as libc::c_uint;
+        while i < n {
+            *xs.offset(i as isize) = *x.offset(i as isize);
+            i = i.wrapping_add(1);
+        }
+    } else {
+        i = 0 as libc::c_int as libc::c_uint;
+        while i < n {
+            *xs.offset(i as isize) = *x.offset(i as isize) * *s.offset(i as isize);
+            i = i.wrapping_add(1);
+        }
+    };
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_new_rescaled(
+    mut n: libc::c_uint,
+    mut s: *const libc::c_double,
+    mut x: *const libc::c_double,
+) -> *mut libc::c_double {
+    let mut xs: *mut libc::c_double = malloc(
+        (::std::mem::size_of::<libc::c_double>() as libc::c_ulong)
+            .wrapping_mul(n as libc::c_ulong),
+    ) as *mut libc::c_double;
+    if xs.is_null() {
+        return 0 as *mut libc::c_double;
+    }
+    nlopt_rescale(n, s, x, xs);
+    return xs;
+}
+#[no_mangle]
+pub unsafe extern "C" fn nlopt_reorder_bounds(
+    mut n: libc::c_uint,
+    mut lb: *mut libc::c_double,
+    mut ub: *mut libc::c_double,
+) {
+    let mut i: libc::c_uint = 0;
+    i = 0 as libc::c_int as libc::c_uint;
+    while i < n {
+        if *lb.offset(i as isize) > *ub.offset(i as isize) {
+            let mut t: libc::c_double = *lb.offset(i as isize);
+            *lb.offset(i as isize) = *ub.offset(i as isize);
+            *ub.offset(i as isize) = t;
+        }
+        i = i.wrapping_add(1);
+    }
 }
 unsafe extern "C" fn dcopy___(
     mut n_: *mut libc::c_int,
@@ -357,9 +905,9 @@ unsafe extern "C" fn h12_(
         cl = fabs(d__1);
         if *mode == 2 as libc::c_int {
             if cl <= 0.0f64 {
-                current_block = 17093842530523746;
+                current_block = 12017783607140213051;
             } else {
-                current_block = 3333486971056105332;
+                current_block = 16897903984108266201;
             }
         } else {
             i__1 = *m;
@@ -371,7 +919,7 @@ unsafe extern "C" fn h12_(
                 j += 1;
             }
             if cl <= 0.0f64 {
-                current_block = 17093842530523746;
+                current_block = 12017783607140213051;
             } else {
                 clinv = one / cl;
                 d__1 = *u.offset((*lpivot * u_dim1 + 1 as libc::c_int) as isize) * clinv;
@@ -389,11 +937,11 @@ unsafe extern "C" fn h12_(
                 }
                 *up = *u.offset((*lpivot * u_dim1 + 1 as libc::c_int) as isize) - cl;
                 *u.offset((*lpivot * u_dim1 + 1 as libc::c_int) as isize) = cl;
-                current_block = 3333486971056105332;
+                current_block = 16897903984108266201;
             }
         }
         match current_block {
-            17093842530523746 => {}
+            12017783607140213051 => {}
             _ => {
                 if !(*ncv <= 0 as libc::c_int) {
                     b = *up * *u.offset((*lpivot * u_dim1 + 1 as libc::c_int) as isize);
@@ -515,9 +1063,9 @@ unsafe extern "C" fn nnls_(
             &mut *x.offset(1 as libc::c_int as isize),
             1 as libc::c_int,
         );
-        'c_9523: loop {
+        'c_11282: loop {
             if iz1 > iz2 || nsetp >= *m {
-                current_block = 375322156561172320;
+                current_block = 1795062611287366171;
                 break;
             }
             i__1 = iz2;
@@ -550,8 +1098,8 @@ unsafe extern "C" fn nnls_(
                     iz += 1;
                 }
                 if wmax <= 0.0f64 {
-                    current_block = 375322156561172320;
-                    break 'c_9523;
+                    current_block = 1795062611287366171;
+                    break 'c_11282;
                 }
                 iz = izmax;
                 j = *indx.offset(iz as isize);
@@ -670,8 +1218,8 @@ unsafe extern "C" fn nnls_(
                 }
                 iter += 1;
                 if !(iter <= itmax) {
-                    current_block = 1305963635923568617;
-                    break 'c_9523;
+                    current_block = 7781325733407116356;
+                    break 'c_11282;
                 }
                 alpha = one;
                 jj = 0 as libc::c_int;
@@ -704,7 +1252,7 @@ unsafe extern "C" fn nnls_(
                     break;
                 }
                 i__ = *indx.offset(jj as isize);
-                'c_9571: loop {
+                'c_11330: loop {
                     *x.offset(i__ as isize) = 0.0f64;
                     jj += 1;
                     i__2 = nsetp;
@@ -747,14 +1295,14 @@ unsafe extern "C" fn nnls_(
                     iz1 -= 1;
                     *indx.offset(iz1 as isize) = i__;
                     if nsetp <= 0 as libc::c_int {
-                        current_block = 1305963635923568617;
-                        break 'c_9523;
+                        current_block = 7781325733407116356;
+                        break 'c_11282;
                     }
                     i__2 = nsetp;
                     jj = 1 as libc::c_int;
                     loop {
                         if !(jj <= i__2) {
-                            break 'c_9571;
+                            break 'c_11330;
                         }
                         i__ = *indx.offset(jj as isize);
                         if *x.offset(i__ as isize) <= 0.0f64 {
@@ -773,7 +1321,7 @@ unsafe extern "C" fn nnls_(
             }
         }
         match current_block {
-            1305963635923568617 => {
+            7781325733407116356 => {
                 *mode = 3 as libc::c_int;
             }
             _ => {}
@@ -1030,7 +1578,7 @@ unsafe extern "C" fn lsi_(
         while j <= i__1 {
             d__1 = *e.offset((j + j * e_dim1) as isize);
             if fabs(d__1) < epmach {
-                current_block = 11162031913793250012;
+                current_block = 1714560199797219869;
                 break 's_121;
             }
             i__3 = j - 1 as libc::c_int;
@@ -1161,7 +1709,7 @@ unsafe extern "C" fn hfti_(
         while j <= i__1 {
             let mut current_block_56: u64;
             if j == 1 as libc::c_int {
-                current_block_56 = 15295264098288563722;
+                current_block_56 = 18323326546081147283;
             } else {
                 lmax = j;
                 i__2 = *n;
@@ -1176,13 +1724,13 @@ unsafe extern "C" fn hfti_(
                 }
                 d__1 = hmax + factor * *h__.offset(lmax as isize);
                 if d__1 - hmax > 0.0f64 {
-                    current_block_56 = 6944351699599669733;
+                    current_block_56 = 17342314209269636488;
                 } else {
-                    current_block_56 = 15295264098288563722;
+                    current_block_56 = 18323326546081147283;
                 }
             }
             match current_block_56 {
-                15295264098288563722 => {
+                18323326546081147283 => {
                     lmax = j;
                     i__2 = *n;
                     l = j;
@@ -1261,7 +1809,7 @@ unsafe extern "C" fn hfti_(
             }
             d__1 = *a.offset((j + j * a_dim1) as isize);
             if fabs(d__1) <= *tau {
-                current_block = 7065588214917223758;
+                current_block = 11399179239179359665;
                 break;
             }
             j += 1;
@@ -1515,7 +2063,7 @@ unsafe extern "C" fn lsei_(
             }
             d__1 = *c__.offset((i__ + i__ * c_dim1) as isize);
             if fabs(d__1) < epmach {
-                current_block = 3697734350124797939;
+                current_block = 1640519170444703904;
                 break;
             }
             i__1 = i__ - 1 as libc::c_int;
@@ -1533,7 +2081,7 @@ unsafe extern "C" fn lsei_(
             i__ += 1;
         }
         match current_block {
-            3697734350124797939 => {}
+            1640519170444703904 => {}
             _ => {
                 *mode = 1 as libc::c_int;
                 *w.offset(mc1 as isize) = 0.0f64;
@@ -1546,7 +2094,7 @@ unsafe extern "C" fn lsei_(
                     1 as libc::c_int,
                 );
                 if *mc == *n {
-                    current_block = 16828568275618539777;
+                    current_block = 10769700236867903670;
                 } else {
                     i__2 = *me;
                     i__ = 1 as libc::c_int;
@@ -1619,7 +2167,7 @@ unsafe extern "C" fn lsei_(
                             mode,
                         );
                         if *mc == 0 as libc::c_int {
-                            current_block = 3697734350124797939;
+                            current_block = 1640519170444703904;
                         } else {
                             t = dnrm2___(
                                 mc,
@@ -1628,9 +2176,9 @@ unsafe extern "C" fn lsei_(
                             );
                             *xnrm = sqrt(*xnrm * *xnrm + t * t);
                             if *mode != 1 as libc::c_int {
-                                current_block = 3697734350124797939;
+                                current_block = 1640519170444703904;
                             } else {
-                                current_block = 16828568275618539777;
+                                current_block = 10769700236867903670;
                             }
                         }
                     } else {
@@ -1660,15 +2208,15 @@ unsafe extern "C" fn lsei_(
                             1 as libc::c_int,
                         );
                         if krank != l {
-                            current_block = 3697734350124797939;
+                            current_block = 1640519170444703904;
                         } else {
                             *mode = 1 as libc::c_int;
-                            current_block = 16828568275618539777;
+                            current_block = 10769700236867903670;
                         }
                     }
                 }
                 match current_block {
-                    3697734350124797939 => {}
+                    1640519170444703904 => {}
                     _ => {
                         i__2 = *me;
                         i__ = 1 as libc::c_int;
@@ -2359,7 +2907,7 @@ unsafe extern "C" fn slsqpb_(
             &mut d__1,
             &mut *u.offset(1 as libc::c_int as isize),
         );
-        current_block = 12300049035009383903;
+        current_block = 6888897117580844842;
     } else if *mode == 0 as libc::c_int {
         itermx = *iter;
         if *acc >= 0.0f64 {
@@ -2390,7 +2938,7 @@ unsafe extern "C" fn slsqpb_(
             &mut *mu.offset(1 as libc::c_int as isize),
             1 as libc::c_int,
         );
-        current_block = 8694785574189000441;
+        current_block = 10732253873254351846;
     } else {
         t = *f;
         i__1 = *m;
@@ -2408,16 +2956,16 @@ unsafe extern "C" fn slsqpb_(
         h1 = t - t0;
         match iexact + 1 as libc::c_int {
             1 => {
-                current_block = 16966658668734368227;
+                current_block = 11231496966810938197;
                 match current_block {
-                    16966658668734368227 => {
+                    11231496966810938197 => {
                         if nlopt_isfinite(h1) != 0 {
                             if h1 <= h3 / ten || line > 10 as libc::c_int {
-                                current_block = 5979535169442150532;
+                                current_block = 2367719738530698383;
                             } else {
                                 d__1 = h3 / (two * (h3 - h1));
                                 alpha = if d__1 >= alfmin { d__1 } else { alfmin };
-                                current_block = 13963123571443036186;
+                                current_block = 18018047807550034048;
                             }
                         } else {
                             alpha = if alpha * 0.5f64 >= alfmin {
@@ -2425,13 +2973,13 @@ unsafe extern "C" fn slsqpb_(
                             } else {
                                 alfmin
                             };
-                            current_block = 13963123571443036186;
+                            current_block = 18018047807550034048;
                         }
                     }
                     _ => {}
                 }
                 match current_block {
-                    13963123571443036186 => {}
+                    18018047807550034048 => {}
                     _ => {
                         h3 = 0.0f64;
                         i__1 = *m;
@@ -2458,24 +3006,24 @@ unsafe extern "C" fn slsqpb_(
                         } else {
                             *mode = -(1 as libc::c_int);
                         }
-                        current_block = 18061940738414093117;
+                        current_block = 10145886053577303292;
                     }
                 }
             }
             2 => {
-                current_block = 1265369698245557087;
+                current_block = 18080407663732281061;
             }
             _ => {
-                current_block = 5979535169442150532;
+                current_block = 2367719738530698383;
                 match current_block {
-                    16966658668734368227 => {
+                    11231496966810938197 => {
                         if nlopt_isfinite(h1) != 0 {
                             if h1 <= h3 / ten || line > 10 as libc::c_int {
-                                current_block = 5979535169442150532;
+                                current_block = 2367719738530698383;
                             } else {
                                 d__1 = h3 / (two * (h3 - h1));
                                 alpha = if d__1 >= alfmin { d__1 } else { alfmin };
-                                current_block = 13963123571443036186;
+                                current_block = 18018047807550034048;
                             }
                         } else {
                             alpha = if alpha * 0.5f64 >= alfmin {
@@ -2483,13 +3031,13 @@ unsafe extern "C" fn slsqpb_(
                             } else {
                                 alfmin
                             };
-                            current_block = 13963123571443036186;
+                            current_block = 18018047807550034048;
                         }
                     }
                     _ => {}
                 }
                 match current_block {
-                    13963123571443036186 => {}
+                    18018047807550034048 => {}
                     _ => {
                         h3 = 0.0f64;
                         i__1 = *m;
@@ -2516,19 +3064,19 @@ unsafe extern "C" fn slsqpb_(
                         } else {
                             *mode = -(1 as libc::c_int);
                         }
-                        current_block = 18061940738414093117;
+                        current_block = 10145886053577303292;
                     }
                 }
             }
         }
     }
-    'c_4721: loop {
+    'c_6480: loop {
         match current_block {
-            1265369698245557087 => {
+            18080407663732281061 => {
                 *mode = 9 as libc::c_int;
                 return;
             }
-            13963123571443036186 => {
+            18018047807550034048 => {
                 line += 1;
                 h3 = alpha * h3;
                 dscal_sl__(
@@ -2567,13 +3115,13 @@ unsafe extern "C" fn slsqpb_(
                 } else {
                     1 as libc::c_int
                 };
-                current_block = 18061940738414093117;
+                current_block = 10145886053577303292;
             }
-            12300049035009383903 => {
+            6888897117580844842 => {
                 *iter += 1;
                 *mode = 9 as libc::c_int;
                 if *iter > itermx && itermx > 0 as libc::c_int {
-                    current_block = 18061940738414093117;
+                    current_block = 10145886053577303292;
                 } else {
                     dcopy___(
                         n,
@@ -2690,16 +3238,16 @@ unsafe extern "C" fn slsqpb_(
                             *l.offset(n3 as isize) = ten * *l.offset(n3 as isize);
                             incons += 1;
                             if incons > 5 as libc::c_int {
-                                current_block = 18061940738414093117;
-                                continue 'c_4721;
+                                current_block = 10145886053577303292;
+                                continue 'c_6480;
                             }
                         }
                         if *mode != 1 as libc::c_int {
-                            current_block = 18061940738414093117;
+                            current_block = 10145886053577303292;
                             continue;
                         }
                     } else if *mode != 1 as libc::c_int {
-                        current_block = 18061940738414093117;
+                        current_block = 10145886053577303292;
                         continue;
                     }
                     i__1 = *n;
@@ -2756,7 +3304,7 @@ unsafe extern "C" fn slsqpb_(
                     }
                     *mode = 0 as libc::c_int;
                     if h1 < *acc && h2 < *acc {
-                        current_block = 18061940738414093117;
+                        current_block = 10145886053577303292;
                         continue;
                     }
                     h1 = 0.0f64;
@@ -2778,19 +3326,19 @@ unsafe extern "C" fn slsqpb_(
                     h3 = gs - h1 * h4;
                     *mode = 8 as libc::c_int;
                     if h3 >= 0.0f64 {
-                        current_block = 8694785574189000441;
+                        current_block = 10732253873254351846;
                         continue;
                     }
                     line = 0 as libc::c_int;
                     alpha = one;
                     if iexact == 1 as libc::c_int {
-                        current_block = 1265369698245557087;
+                        current_block = 18080407663732281061;
                     } else {
-                        current_block = 13963123571443036186;
+                        current_block = 18018047807550034048;
                     }
                 }
             }
-            8694785574189000441 => {
+            10732253873254351846 => {
                 ireset += 1;
                 if ireset > 5 as libc::c_int {
                     d__1 = *f - f0;
@@ -2805,7 +3353,7 @@ unsafe extern "C" fn slsqpb_(
                     } else {
                         *mode = 8 as libc::c_int;
                     }
-                    current_block = 18061940738414093117;
+                    current_block = 10145886053577303292;
                 } else {
                     *l.offset(1 as libc::c_int as isize) = 0.0f64;
                     dcopy___(
@@ -2823,7 +3371,7 @@ unsafe extern "C" fn slsqpb_(
                         j = j + n1 - i__;
                         i__ += 1;
                     }
-                    current_block = 12300049035009383903;
+                    current_block = 6888897117580844842;
                 }
             }
             _ => {
@@ -2948,8 +3496,8 @@ unsafe extern "C" fn slsqp(
         &mut *jw.offset(1 as libc::c_int as isize),
         state,
     );
-    let ref mut fresh0 = (*state).x0;
-    *fresh0 = &mut *w.offset(ix as isize) as *mut libc::c_double;
+    let ref mut fresh1 = (*state).x0;
+    *fresh1 = &mut *w.offset(ix as isize) as *mut libc::c_double;
 }
 unsafe extern "C" fn length_work(
     mut LEN_W: *mut libc::c_int,
@@ -3099,7 +3647,7 @@ pub unsafe extern "C" fn nlopt_slsqp(
     fprev = fcur;
     feasible_cur = 0 as libc::c_int;
     feasible = feasible_cur;
-    'c_4283: loop {
+    'c_6042: loop {
         want_grad = 1 as libc::c_int;
         's_146: loop {
             let mut newgrad: *mut libc::c_double = 0 as *mut libc::c_double;
@@ -3111,12 +3659,12 @@ pub unsafe extern "C" fn nlopt_slsqp(
             feasible_cur = 1 as libc::c_int;
             infeasibility_cur = 0 as libc::c_int as libc::c_double;
             fcur = f.expect("non-null function pointer")(n, xcur, newgrad, f_data);
-            let ref mut fresh1 = *(*stop).nevals_p;
-            *fresh1 += 1;
+            let ref mut fresh2 = *(*stop).nevals_p;
+            *fresh2 += 1;
             if nlopt_stop_forced(stop) != 0 {
                 fcur = ::std::f64::INFINITY;
                 ret = NLOPT_FORCED_STOP;
-                break 'c_4283;
+                break 'c_6042;
             } else {
                 if nlopt_isfinite(fcur) != 0 {
                     want_grad = 0 as libc::c_int;
@@ -3134,7 +3682,7 @@ pub unsafe extern "C" fn nlopt_slsqp(
                         );
                         if nlopt_stop_forced(stop) != 0 {
                             ret = NLOPT_FORCED_STOP;
-                            break 'c_4283;
+                            break 'c_6042;
                         } else {
                             k = 0 as libc::c_int as libc::c_uint;
                             while k < (*h.offset(i as isize)).m {
@@ -3180,7 +3728,7 @@ pub unsafe extern "C" fn nlopt_slsqp(
                         );
                         if nlopt_stop_forced(stop) != 0 {
                             ret = NLOPT_FORCED_STOP;
-                            break 'c_4283;
+                            break 'c_6042;
                         } else {
                             k_0 = 0 as libc::c_int as libc::c_uint;
                             while k_0 < (*fc.offset(i as isize)).m {
@@ -3255,7 +3803,7 @@ pub unsafe extern "C" fn nlopt_slsqp(
                         ret = NLOPT_STOPVAL_REACHED;
                     }
                     if !(ret as libc::c_int == NLOPT_SUCCESS as libc::c_int) {
-                        break 'c_4283;
+                        break 'c_6042;
                     }
                     slsqp(
                         &mut mpi,
@@ -3281,17 +3829,17 @@ pub unsafe extern "C" fn nlopt_slsqp(
                     match mode {
                         -1 => {
                             if !(prev_mode == -(2 as libc::c_int) && want_grad == 0) {
-                                continue 'c_4283;
+                                continue 'c_6042;
                             }
                         }
                         -2 => {
-                            continue 'c_4283;
+                            continue 'c_6042;
                         }
                         1 => {
                             break;
                         }
                         0 => {
-                            break 'c_4283;
+                            break 'c_6042;
                         }
                         8 => {
                             ret = NLOPT_ROUNDOFF_LIMITED;
@@ -3311,22 +3859,22 @@ pub unsafe extern "C" fn nlopt_slsqp(
                                 (*stop).ftol_abs = save_ftol_abs;
                                 (*stop).xtol_rel = save_xtol_rel;
                             }
-                            break 'c_4283;
+                            break 'c_6042;
                         }
                         5 => {
-                            current_block = 6184364715258491107;
+                            current_block = 9714366428826605325;
                             break 's_146;
                         }
                         6 | 7 => {
-                            current_block = 6184364715258491107;
+                            current_block = 9714366428826605325;
                             break 's_146;
                         }
                         4 => {
-                            current_block = 11765153459817976177;
+                            current_block = 8507021683849773288;
                             break 's_146;
                         }
                         3 | 9 => {
-                            current_block = 11765153459817976177;
+                            current_block = 8507021683849773288;
                             break 's_146;
                         }
                         2 | _ => {
@@ -3336,14 +3884,14 @@ pub unsafe extern "C" fn nlopt_slsqp(
                                     as *const libc::c_char,
                             );
                             ret = NLOPT_INVALID_ARGS;
-                            break 'c_4283;
+                            break 'c_6042;
                         }
                     }
                 }
             }
         }
         match current_block {
-            6184364715258491107 => {
+            9714366428826605325 => {
                 ret = NLOPT_ROUNDOFF_LIMITED;
                 break;
             }

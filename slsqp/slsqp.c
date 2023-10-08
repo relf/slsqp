@@ -11,6 +11,10 @@
 
 #include "slsqp.h"
 
+#include "timer.c"
+#include "stop.c"
+#include "rescale.c"
+
 /*      ALGORITHM 733, COLLECTED ALGORITHMS FROM ACM. */
 /*      TRANSACTIONS ON MATHEMATICAL SOFTWARE, */
 /*      VOL. 20, NO. 3, SEPTEMBER, 1994, PP. 262-281. */
