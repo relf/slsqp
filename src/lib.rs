@@ -1,90 +1,164 @@
 mod slsqp;
 
-// use std::os::raw::c_void;
-// use std::slice;
+use crate::slsqp::{
+    nlopt_constraint, nlopt_constraint_raw_callback, nlopt_function_raw_callback, nlopt_stopping,
+    NLoptConstraintCfg, NLoptFunctionCfg, NLoptObjFn,
+};
+use std::os::raw::c_void;
 
-// use std::os::raw::c_void;
-// use std::slice;
+/// Minimizes a function using the SLSQP method.
+/// This implementation is a translation of [NLopt](https://github.com/stevengj/nlopt) 2.7.1
+///
+/// See [NLopt SLSQP](https://nlopt.readthedocs.io/en/latest/NLopt_Algorithms/#slsqp) documentation.
+#[allow(clippy::useless_conversion)]
+#[allow(clippy::too_many_arguments)]
+pub fn nlopt_slsqp<'a, F: NLoptObjFn<U>, G: NLoptObjFn<U>, U: Clone>(
+    func: F,
+    x0: &'a mut [f64],
+    cons: &[G],
+    args: U,
+    rhobeg: f64,
+    rhoend: f64,
+    maxfun: i32,
+    _iprint: i32,
+    bounds: (f64, f64),
+) -> (i32, &'a [f64]) {
+    let fn_cfg = Box::new(NLoptFunctionCfg {
+        objective_fn: func,
+        user_data: args.clone(), // move user_data into FunctionCfg
+    });
+    let fn_cfg_ptr = Box::into_raw(fn_cfg) as *mut c_void;
+    let mut cstr_tol = 2e-4;
 
-// /// A trait for an objective function to be minimized
-// ///
-// /// An objective function takes the form of a closure `f(x: &[f64], user_data: &mut U) -> f64`
-// ///
-// /// * `x` - n-dimensional array
-// /// * `user_data` - user defined data
-// pub trait ObjFn<U>: Fn(&[f64], &mut U) -> f64 {}
-// impl<F, U> ObjFn<U> for F where F: Fn(&[f64], &mut U) -> f64 {}
+    let mut cstr_cfg = cons
+        .iter()
+        .map(|c| {
+            let c_cfg = Box::new(NLoptConstraintCfg {
+                constraint_fn: c as &dyn NLoptObjFn<U>,
+                user_data: args.clone(), // move user_data into FunctionCfg
+            });
+            let c_cfg_ptr = Box::into_raw(c_cfg) as *mut c_void;
 
-// /// A trait for a constraint function which should be positive eventually
-// ///
-// /// A constraint function takes the form of a closure `f(x: &[f64]) -> f64`
-// /// The algorithm makes the constraint positive eventually.
-// ///
-// /// For instance if you want an upper bound MAX for x,
-// /// you have to define the constraint as `|x| MAX - x`.
-// /// Conversly for a lower bound you would define `|x| x - MIN`
-// ///
-// /// * `x` - n-dimensional array
-// pub trait CstrFn: Fn(&[f64]) -> f64 {}
-// impl<F> CstrFn for F where F: Fn(&[f64]) -> f64 {}
+            nlopt_constraint {
+                m: 1,
+                f: Some(nlopt_constraint_raw_callback::<F, U>),
+                pre: None,
+                mf: None,
+                f_data: c_cfg_ptr,
+                tol: &mut cstr_tol,
+            }
+        })
+        .collect::<Vec<_>>();
 
-// /// Packs a function with a user defined parameter set of type `U`
-// /// and constraints to be made positive eventually by the optimizer
-// struct FunctionCfg<'a, F: ObjFn<U>, G: CstrFn, U> {
-//     pub func: F,
-//     pub cons: &'a [G],
-//     pub data: U,
-// }
+    let x = x0;
+    let n = x.len() as u32;
+    let m = cons.len() as u32;
 
-// /// Callback interface for Cobyla C code to evaluate objective and constraint functions
-// fn function_raw_callback<F: ObjFn<U>, G: CstrFn, U>(
-//     n: ::std::os::raw::c_long,
-//     m: ::std::os::raw::c_long,
-//     x: *const f64,
-//     con: *mut f64,
-//     data: *mut ::std::os::raw::c_void,
-// ) -> f64 {
-//     // prepare args
-//     let argument = unsafe { slice::from_raw_parts(x, n as usize) };
-//     // recover FunctionCfg object from supplied params and call
-//     let f = unsafe { &mut *(data as *mut FunctionCfg<F, G, U>) };
-//     let res = (f.func)(argument, &mut f.data);
+    let lb = vec![bounds.0; n as usize];
+    let ub = vec![bounds.1; n as usize];
+    let xtol_abs = vec![0.; n as usize];
+    let x_weights = vec![0.; n as usize];
+    let mut minf = f64::INFINITY;
+    let mut nevals_p = 0;
+    let mut force_stop = 0;
+    let mut stop = nlopt_stopping {
+        n,
+        minf_max: -f64::INFINITY,
+        ftol_rel: 1e-4,
+        ftol_abs: 0.0,
+        xtol_rel: rhoend / rhobeg,
+        xtol_abs: xtol_abs.as_ptr(),
+        x_weights: x_weights.as_ptr(),
+        nevals_p: &mut nevals_p,
+        maxeval: maxfun.into(),
+        maxtime: 0.0,
+        start: 0.0,
+        force_stop: &mut force_stop,
+        stop_msg: "".to_string(),
+    };
 
-//     for i in 0..m as isize {
-//         unsafe {
-//             *con.offset(i) = (f.cons[i as usize])(argument);
-//         }
-//     }
+    // XXX: Weird bug. Can not pass nlopt_constraint_raw_callback
+    // Work around is to patch nlopt_eval_constraint to use nlopt_constraint_raw_callback directly
+    // if !cons.is_empty() {
+    //     let mut xtest = vec![1., 1.];
+    //     unsafe {
+    //         let mut result = -666.;
+    //         let nc = cstr_cfg[0];
+    //         let fc = &nc as *const nlopt_constraint;
 
-//     // Important: we don't want f to get dropped at this point
-//     #[allow(clippy::forget_ref)]
-//     std::mem::forget(f);
-//     res
-// }
+    //         // It works: cstr1 is called
+    //         let _res = nlopt_constraint_raw_callback::<&dyn NLoptObjFn<()>, ()>(
+    //             2,
+    //             xtest.as_mut_ptr(),
+    //             std::ptr::null_mut::<libc::c_double>(),
+    //             (nc).f_data,
+    //         );
+    //         // println!(
+    //         //     "###################################### JUST direct nlopt_constraint_raw_callback is OK = {}",
+    //         //     res,
+    //         // );
 
-// /// Minimizes a function using the SLSQP method.
-// ///
-// #[allow(clippy::useless_conversion)]
-// #[allow(clippy::too_many_arguments)]
-// pub fn fmin_slsqp<'a, F: ObjFn<U>, G: CstrFn, U>(
-//     func: F,
-//     x0: &'a mut [f64],
-//     cons: &[G],
-//     args: U,
-//     rhobeg: f64,
-//     rhoend: f64,
-//     maxfun: i32,
-//     iprint: i32,
-// ) -> (i32, &'a [f64]) {
-//     todo!()
-// }
+    //         // XXX: Weird bug!
+    //         // If fails : (*fc).f does call nlopt_constraint_raw_callback but
+    //         // when unpacking (*fc).f_data with unsafe f = { &mut *(params as *mut NLoptConstraintCfg<F, T>) };
+    //         // (*f).constraint_fn(...) calls the objective function instead of the constraint function!!!
+    //         let _res = ((*fc).f.expect("func"))(
+    //             2,
+    //             xtest.as_mut_ptr(),
+    //             std::ptr::null_mut::<libc::c_double>(),
+    //             (*fc).f_data,
+    //         );
+    //         // println!(
+    //         //     "###################################### JUST stored nlopt_constraint_raw_callback is NOT OK = {}",
+    //         //     res,
+    //         // );
+
+    //         // It works: cstr1 is called
+    //         // we use directly a copy of specialized nlopt_constraint_raw_callback
+    //         nlopt_eval_constraint::<()>(
+    //             &mut result,
+    //             std::ptr::null_mut::<libc::c_double>(),
+    //             fc,
+    //             n,
+    //             x.as_mut_ptr(),
+    //         );
+    //         // println!(
+    //         //     "############################### TEST nlopt_eval_constraint (OK if opposite previous OK result) = {}",
+    //         //     result
+    //         // );
+    //     }
+    // }
+
+    let status = unsafe {
+        slsqp::nlopt_slsqp::<U>(
+            n.into(),
+            Some(nlopt_function_raw_callback::<F, U>),
+            fn_cfg_ptr,
+            m.into(),
+            cstr_cfg.as_mut_ptr(),
+            0,
+            std::ptr::null_mut(),
+            lb.as_ptr(),
+            ub.as_ptr(),
+            x.as_mut_ptr(),
+            &mut minf,
+            &mut stop,
+        )
+    };
+
+    // Convert the raw pointer back into a Box with the B::from_raw function,
+    // allowing the Box destructor to perform the cleanup.
+    unsafe {
+        let _ = Box::from_raw(fn_cfg_ptr as *mut NLoptFunctionCfg<F, U>);
+    };
+    (status, x)
+}
 
 #[cfg(test)]
 mod tests {
-    use crate::slsqp::{nlopt_slsqp, nlopt_stopping};
     use approx::assert_abs_diff_eq;
 
-    // use super::*;
+    use super::*;
 
     ////////////////////////////////////////////////////////////////////////////////
     /// Nlopt slsqp
@@ -134,7 +208,7 @@ mod tests {
         };
 
         let res = unsafe {
-            nlopt_slsqp(
+            slsqp::nlopt_slsqp::<()>(
                 2,
                 Some(nlopt_raw_paraboloid),
                 std::ptr::null_mut(),
@@ -154,5 +228,48 @@ mod tests {
         println!("x = {:?}", x);
 
         assert_abs_diff_eq!(x.as_slice(), [-1., 0.].as_slice(), epsilon = 1e-4);
+    }
+
+    fn nlopt_paraboloid(x: &[f64], gradient: Option<&mut [f64]>, _data: &mut ()) -> f64 {
+        println!("{:?}", x);
+        let r1 = x[0] + 1.0;
+        let r2 = x[1];
+        if let Some(g) = gradient {
+            g[0] = 20.0 * r1;
+            g[1] = 2. * r2;
+        }
+        10. * r1 * r1 + r2 * r2
+    }
+
+    #[test]
+    fn test_nlopt_paraboloid() {
+        let mut x = vec![1., 1.];
+
+        let mut cons: Vec<&dyn NLoptObjFn<()>> = vec![];
+        let cstr1 = |x: &[f64], gradient: Option<&mut [f64]>, _user_data: &mut ()| {
+            if let Some(g) = gradient {
+                g[0] = -1.;
+                g[1] = 0.;
+            }
+            -x[0]
+        };
+        cons.push(&cstr1 as &dyn NLoptObjFn<()>);
+
+        // x_opt = [0, 0]
+        let (status, x_opt) = nlopt_slsqp(
+            nlopt_paraboloid,
+            &mut x,
+            &cons,
+            (),
+            0.5,
+            0.0,
+            200,
+            1,
+            (-10., 10.),
+        );
+        println!("status = {}", status);
+        println!("x = {:?}", x_opt);
+
+        assert_abs_diff_eq!(x.as_slice(), [0., 0.].as_slice(), epsilon = 1e-3);
     }
 }
