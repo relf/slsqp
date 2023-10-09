@@ -1,5 +1,4 @@
 mod slsqp;
-use crate::slsqp::{nlopt_slsqp, nlopt_stopping};
 
 // use std::os::raw::c_void;
 // use std::slice;
@@ -82,9 +81,10 @@ use crate::slsqp::{nlopt_slsqp, nlopt_stopping};
 
 #[cfg(test)]
 mod tests {
+    use crate::slsqp::{nlopt_slsqp, nlopt_stopping};
     use approx::assert_abs_diff_eq;
 
-    use super::*;
+    // use super::*;
 
     ////////////////////////////////////////////////////////////////////////////////
     /// Nlopt slsqp
@@ -113,7 +113,6 @@ mod tests {
         let mut x = vec![1., 1.];
         let mut lb = vec![-10.0, -10.0];
         let mut ub = vec![10.0, 10.0];
-        let mut dx = vec![0.5, 0.5];
         let mut minf = f64::INFINITY;
         let mut nevals_p = 0;
         let mut force_stop = 0;

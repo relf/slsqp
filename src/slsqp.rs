@@ -1167,7 +1167,7 @@ unsafe fn nnls_(
             }
             dcopy___(
                 m,
-                &mut *z__.offset(1 as libc::c_int as isize),
+                z__.offset(1 as libc::c_int as isize),
                 1 as libc::c_int,
                 &mut *b.offset(1 as libc::c_int as isize),
                 1 as libc::c_int,
@@ -1201,7 +1201,7 @@ unsafe fn nnls_(
             i__2 = *m - nsetp;
             dcopy___(
                 &mut i__2,
-                &mut *w.offset(j as isize),
+                w.offset(j as isize),
                 0 as libc::c_int,
                 &mut *a.offset((k + j * a_dim1) as isize),
                 1 as libc::c_int,
@@ -1213,8 +1213,8 @@ unsafe fn nnls_(
                         d__1 = -*z__.offset((ip + 1 as libc::c_int) as isize);
                         daxpy_sl__(
                             &mut ip,
-                            &mut d__1,
-                            &mut *a.offset((jj * a_dim1 + 1 as libc::c_int) as isize),
+                            &d__1,
+                            a.offset((jj * a_dim1 + 1 as libc::c_int) as isize),
                             1 as libc::c_int,
                             &mut *z__.offset(1 as libc::c_int as isize),
                             1 as libc::c_int,
@@ -1317,7 +1317,7 @@ unsafe fn nnls_(
                 }
                 dcopy___(
                     m,
-                    &mut *b.offset(1 as libc::c_int as isize),
+                    b.offset(1 as libc::c_int as isize),
                     1 as libc::c_int,
                     &mut *z__.offset(1 as libc::c_int as isize),
                     1 as libc::c_int,
@@ -1337,7 +1337,7 @@ unsafe fn nnls_(
             *w.offset(1 as libc::c_int as isize) = 0.0f64;
             dcopy___(
                 n,
-                &mut *w.offset(1 as libc::c_int as isize),
+                w.offset(1 as libc::c_int as isize),
                 0 as libc::c_int,
                 &mut *w.offset(1 as libc::c_int as isize),
                 1 as libc::c_int,
@@ -1386,7 +1386,7 @@ unsafe fn ldp_(
         *x.offset(1 as libc::c_int as isize) = 0.0f64;
         dcopy___(
             n,
-            &mut *x.offset(1 as libc::c_int as isize),
+            x.offset(1 as libc::c_int as isize),
             0 as libc::c_int,
             &mut *x.offset(1 as libc::c_int as isize),
             1 as libc::c_int,
@@ -1470,15 +1470,15 @@ unsafe fn ldp_(
                         *w.offset(1 as libc::c_int as isize) = 0.0f64;
                         dcopy___(
                             m,
-                            &mut *w.offset(1 as libc::c_int as isize),
+                            w.offset(1 as libc::c_int as isize),
                             0 as libc::c_int,
                             &mut *w.offset(1 as libc::c_int as isize),
                             1 as libc::c_int,
                         );
                         daxpy_sl__(
                             m,
-                            &mut fac,
-                            &mut *w.offset(iy as isize),
+                            &fac,
+                            w.offset(iy as isize),
                             1 as libc::c_int,
                             &mut *w.offset(1 as libc::c_int as isize),
                             1 as libc::c_int,
@@ -1548,7 +1548,7 @@ unsafe fn lsi_(
             &mut *e.offset((j * e_dim1 + 1 as libc::c_int) as isize),
             &c__1,
             le,
-            &mut i__3,
+            &i__3,
         );
         i__2 = i__ + 1 as libc::c_int;
         h12_(
@@ -1621,7 +1621,7 @@ unsafe fn lsi_(
                 daxpy_sl__(
                     n,
                     &one,
-                    &mut *f.offset(1 as libc::c_int as isize),
+                    f.offset(1 as libc::c_int as isize),
                     1 as libc::c_int,
                     &mut *x.offset(1 as libc::c_int as isize),
                     1 as libc::c_int,
@@ -1776,7 +1776,7 @@ unsafe fn hfti_(
                 &mut *a.offset((i__ * a_dim1 + 1 as libc::c_int) as isize),
                 &c__1,
                 mda,
-                &mut i__3,
+                &i__3,
             );
             i__2 = j + 1 as libc::c_int;
             h12_(
@@ -1844,7 +1844,7 @@ unsafe fn hfti_(
                         &mut *a.offset(a_offset as isize),
                         mda,
                         &c__1,
-                        &mut i__2,
+                        &i__2,
                     );
                     i__ -= 1;
                 }
@@ -2008,7 +2008,7 @@ unsafe fn lsei_(
                 &mut *c__.offset((j + c_dim1) as isize),
                 lc,
                 &c__1,
-                &mut i__3,
+                &i__3,
             );
             i__2 = i__ + 1 as libc::c_int;
             h12_(
@@ -2073,7 +2073,7 @@ unsafe fn lsei_(
                 i__2 = *mg;
                 dcopy___(
                     &mut i__2,
-                    &mut *w.offset(mc1 as isize),
+                    w.offset(mc1 as isize),
                     0 as libc::c_int,
                     &mut *w.offset(mc1 as isize),
                     1 as libc::c_int,
@@ -2100,7 +2100,7 @@ unsafe fn lsei_(
                     while i__ <= i__2 {
                         dcopy___(
                             &mut l,
-                            &mut *e.offset((i__ + mc1 * e_dim1) as isize),
+                            e.offset((i__ + mc1 * e_dim1) as isize),
                             *le,
                             &mut *w.offset((ie - 1 as libc::c_int + i__) as isize),
                             *me,
@@ -2112,7 +2112,7 @@ unsafe fn lsei_(
                     while i__ <= i__2 {
                         dcopy___(
                             &mut l,
-                            &mut *g.offset((i__ + mc1 * g_dim1) as isize),
+                            g.offset((i__ + mc1 * g_dim1) as isize),
                             *lg,
                             &mut *w.offset((ig - 1 as libc::c_int + i__) as isize),
                             *mg,
@@ -2184,7 +2184,7 @@ unsafe fn lsei_(
                         );
                         dcopy___(
                             &mut l,
-                            &mut *w.offset(if__ as isize),
+                            w.offset(if__ as isize),
                             1 as libc::c_int,
                             &mut *x.offset(mc1 as isize),
                             1 as libc::c_int,
@@ -2352,7 +2352,7 @@ unsafe fn lsq_(
         *w.offset(i3 as isize) = 0.0f64;
         dcopy___(
             &mut i1,
-            &mut *w.offset(i3 as isize),
+            w.offset(i3 as isize),
             0 as libc::c_int,
             &mut *w.offset(i3 as isize),
             1 as libc::c_int,
@@ -2360,13 +2360,13 @@ unsafe fn lsq_(
         i__2 = i1 - n2;
         dcopy___(
             &mut i__2,
-            &mut *l.offset(i2 as isize),
+            l.offset(i2 as isize),
             1 as libc::c_int,
             &mut *w.offset(i3 as isize),
             *n,
         );
         i__2 = i1 - n2;
-        dscal_sl__(&mut i__2, &mut diag, &mut *w.offset(i3 as isize), *n);
+        dscal_sl__(&mut i__2, &diag, &mut *w.offset(i3 as isize), *n);
         *w.offset(i3 as isize) = diag;
         i__2 = i__ - 1 as libc::c_int;
         *w.offset((if__ - 1 as libc::c_int + i__) as isize) = (*g.offset(i__ as isize)
@@ -2388,7 +2388,7 @@ unsafe fn lsq_(
         *w.offset(i4 as isize) = 0.0f64;
         dcopy___(
             &mut n3,
-            &mut *w.offset(i4 as isize),
+            w.offset(i4 as isize),
             0 as libc::c_int,
             &mut *w.offset(i4 as isize),
             1 as libc::c_int,
@@ -2396,12 +2396,7 @@ unsafe fn lsq_(
         *w.offset((if__ - 1 as libc::c_int + *n) as isize) = 0.0f64;
     }
     d__1 = -one;
-    dscal_sl__(
-        n,
-        &mut d__1,
-        &mut *w.offset(if__ as isize),
-        1 as libc::c_int,
-    );
+    dscal_sl__(n, &d__1, &mut *w.offset(if__ as isize), 1 as libc::c_int);
     ic = if__ + *n;
     id = ic + *meq * *n;
     if *meq > 0 as libc::c_int {
@@ -2410,7 +2405,7 @@ unsafe fn lsq_(
         while i__ <= i__1 {
             dcopy___(
                 n,
-                &mut *a.offset((i__ + a_dim1) as isize),
+                a.offset((i__ + a_dim1) as isize),
                 *la,
                 &mut *w.offset((ic - 1 as libc::c_int + i__) as isize),
                 *meq,
@@ -2419,18 +2414,13 @@ unsafe fn lsq_(
         }
         dcopy___(
             meq,
-            &mut *b.offset(1 as libc::c_int as isize),
+            b.offset(1 as libc::c_int as isize),
             1 as libc::c_int,
             &mut *w.offset(id as isize),
             1 as libc::c_int,
         );
         d__1 = -one;
-        dscal_sl__(
-            meq,
-            &mut d__1,
-            &mut *w.offset(id as isize),
-            1 as libc::c_int,
-        );
+        dscal_sl__(meq, &d__1, &mut *w.offset(id as isize), 1 as libc::c_int);
     }
     ig = id + *meq;
     if mineq > 0 as libc::c_int {
@@ -2439,7 +2429,7 @@ unsafe fn lsq_(
         while i__ <= i__1 {
             dcopy___(
                 n,
-                &mut *a.offset((*meq + i__ + a_dim1) as isize),
+                a.offset((*meq + i__ + a_dim1) as isize),
                 *la,
                 &mut *w.offset((ig - 1 as libc::c_int + i__) as isize),
                 m1,
@@ -2454,7 +2444,7 @@ unsafe fn lsq_(
         *w.offset((ip - 1 as libc::c_int + i__) as isize) = 0.0f64;
         dcopy___(
             n,
-            &mut *w.offset((ip - 1 as libc::c_int + i__) as isize),
+            w.offset((ip - 1 as libc::c_int + i__) as isize),
             0 as libc::c_int,
             &mut *w.offset((ip - 1 as libc::c_int + i__) as isize),
             m1,
@@ -2476,7 +2466,7 @@ unsafe fn lsq_(
         *w.offset((im - 1 as libc::c_int + i__) as isize) = 0.0f64;
         dcopy___(
             n,
-            &mut *w.offset((im - 1 as libc::c_int + i__) as isize),
+            w.offset((im - 1 as libc::c_int + i__) as isize),
             0 as libc::c_int,
             &mut *w.offset((im - 1 as libc::c_int + i__) as isize),
             m1,
@@ -2495,7 +2485,7 @@ unsafe fn lsq_(
     if mineq > 0 as libc::c_int {
         dcopy___(
             &mut mineq,
-            &mut *b.offset((*meq + 1 as libc::c_int) as isize),
+            b.offset((*meq + 1 as libc::c_int) as isize),
             1 as libc::c_int,
             &mut *w.offset(ih as isize),
             1 as libc::c_int,
@@ -2503,7 +2493,7 @@ unsafe fn lsq_(
         d__1 = -one;
         dscal_sl__(
             &mut mineq,
-            &mut d__1,
+            &d__1,
             &mut *w.offset(ih as isize),
             1 as libc::c_int,
         );
@@ -2555,21 +2545,21 @@ unsafe fn lsq_(
     if *mode == 1 as libc::c_int {
         dcopy___(
             m,
-            &mut *w.offset(iw as isize),
+            w.offset(iw as isize),
             1 as libc::c_int,
             &mut *y.offset(1 as libc::c_int as isize),
             1 as libc::c_int,
         );
         dcopy___(
             &mut n3,
-            &mut *w.offset((iw + *m) as isize),
+            w.offset((iw + *m) as isize),
             1 as libc::c_int,
             &mut *y.offset((*m + 1 as libc::c_int) as isize),
             1 as libc::c_int,
         );
         dcopy___(
             &mut n3,
-            &mut *w.offset((iw + *m + *n) as isize),
+            w.offset((iw + *m + *n) as isize),
             1 as libc::c_int,
             &mut *y.offset((*m + n3 + 1 as libc::c_int) as isize),
             1 as libc::c_int,
@@ -2861,15 +2851,15 @@ unsafe fn slsqpb_(
             h1 = h3;
             dscal_sl__(
                 n,
-                &mut h4,
+                &h4,
                 &mut *u.offset(1 as libc::c_int as isize),
                 1 as libc::c_int,
             );
             d__1 = one - h4;
             daxpy_sl__(
                 n,
-                &mut d__1,
-                &mut *v.offset(1 as libc::c_int as isize),
+                &d__1,
+                v.offset(1 as libc::c_int as isize),
                 1 as libc::c_int,
                 &mut *u.offset(1 as libc::c_int as isize),
                 1 as libc::c_int,
@@ -2910,14 +2900,14 @@ unsafe fn slsqpb_(
         *mu.offset(1 as libc::c_int as isize) = 0.0f64;
         dcopy___(
             n,
-            &mut *s.offset(1 as libc::c_int as isize),
+            s.offset(1 as libc::c_int as isize),
             0 as libc::c_int,
             &mut *s.offset(1 as libc::c_int as isize),
             1 as libc::c_int,
         );
         dcopy___(
             m,
-            &mut *mu.offset(1 as libc::c_int as isize),
+            mu.offset(1 as libc::c_int as isize),
             0 as libc::c_int,
             &mut *mu.offset(1 as libc::c_int as isize),
             1 as libc::c_int,
@@ -3067,13 +3057,13 @@ unsafe fn slsqpb_(
                 h3 = alpha * h3;
                 dscal_sl__(
                     n,
-                    &mut alpha,
+                    &alpha,
                     &mut *s.offset(1 as libc::c_int as isize),
                     1 as libc::c_int,
                 );
                 dcopy___(
                     n,
-                    &mut *x0.offset(1 as libc::c_int as isize),
+                    x0.offset(1 as libc::c_int as isize),
                     1 as libc::c_int,
                     &mut *x.offset(1 as libc::c_int as isize),
                     1 as libc::c_int,
@@ -3081,7 +3071,7 @@ unsafe fn slsqpb_(
                 daxpy_sl__(
                     n,
                     &one,
-                    &mut *s.offset(1 as libc::c_int as isize),
+                    s.offset(1 as libc::c_int as isize),
                     1 as libc::c_int,
                     &mut *x.offset(1 as libc::c_int as isize),
                     1 as libc::c_int,
@@ -3126,8 +3116,8 @@ unsafe fn slsqpb_(
                     d__1 = -one;
                     daxpy_sl__(
                         n,
-                        &mut d__1,
-                        &mut *x.offset(1 as libc::c_int as isize),
+                        &d__1,
+                        x.offset(1 as libc::c_int as isize),
                         1 as libc::c_int,
                         &mut *u.offset(1 as libc::c_int as isize),
                         1 as libc::c_int,
@@ -3135,8 +3125,8 @@ unsafe fn slsqpb_(
                     d__1 = -one;
                     daxpy_sl__(
                         n,
-                        &mut d__1,
-                        &mut *x.offset(1 as libc::c_int as isize),
+                        &d__1,
+                        x.offset(1 as libc::c_int as isize),
                         1 as libc::c_int,
                         &mut *v.offset(1 as libc::c_int as isize),
                         1 as libc::c_int,
@@ -3152,8 +3142,8 @@ unsafe fn slsqpb_(
                         &mut *g.offset(1 as libc::c_int as isize),
                         &mut *a.offset(a_offset as isize),
                         &mut *c__.offset(1 as libc::c_int as isize),
-                        &mut *u.offset(1 as libc::c_int as isize),
-                        &mut *v.offset(1 as libc::c_int as isize),
+                        u.offset(1 as libc::c_int as isize),
+                        v.offset(1 as libc::c_int as isize),
                         &mut *s.offset(1 as libc::c_int as isize),
                         &mut *r__.offset(1 as libc::c_int as isize),
                         &mut *w.offset(1 as libc::c_int as isize),
@@ -3181,7 +3171,7 @@ unsafe fn slsqpb_(
                         *s.offset(1 as libc::c_int as isize) = 0.0f64;
                         dcopy___(
                             n,
-                            &mut *s.offset(1 as libc::c_int as isize),
+                            s.offset(1 as libc::c_int as isize),
                             0 as libc::c_int,
                             &mut *s.offset(1 as libc::c_int as isize),
                             1 as libc::c_int,
@@ -3204,8 +3194,8 @@ unsafe fn slsqpb_(
                                 &mut *g.offset(1 as libc::c_int as isize),
                                 &mut *a.offset(a_offset as isize),
                                 &mut *c__.offset(1 as libc::c_int as isize),
-                                &mut *u.offset(1 as libc::c_int as isize),
-                                &mut *v.offset(1 as libc::c_int as isize),
+                                u.offset(1 as libc::c_int as isize),
+                                v.offset(1 as libc::c_int as isize),
                                 &mut *s.offset(1 as libc::c_int as isize),
                                 &mut *r__.offset(1 as libc::c_int as isize),
                                 &mut *w.offset(1 as libc::c_int as isize),
@@ -3247,7 +3237,7 @@ unsafe fn slsqpb_(
                     f0 = *f;
                     dcopy___(
                         n,
-                        &mut *x.offset(1 as libc::c_int as isize),
+                        x.offset(1 as libc::c_int as isize),
                         1 as libc::c_int,
                         &mut *x0.offset(1 as libc::c_int as isize),
                         1 as libc::c_int,
@@ -3335,7 +3325,7 @@ unsafe fn slsqpb_(
                     *l.offset(1 as libc::c_int as isize) = 0.0f64;
                     dcopy___(
                         &mut n2,
-                        &mut *l.offset(1 as libc::c_int as isize),
+                        l.offset(1 as libc::c_int as isize),
                         0 as libc::c_int,
                         &mut *l.offset(1 as libc::c_int as isize),
                         1 as libc::c_int,
@@ -3537,30 +3527,28 @@ pub unsafe fn nlopt_slsqp(
     mut stop: *mut nlopt_stopping,
 ) -> nlopt_result {
     let mut current_block: u64;
-    let mut state: slsqpb_state = {
-        let mut init = slsqpb_state {
-            t: 0 as libc::c_int as libc::c_double,
-            f0: 0 as libc::c_int as libc::c_double,
-            h1: 0 as libc::c_int as libc::c_double,
-            h2: 0 as libc::c_int as libc::c_double,
-            h3: 0 as libc::c_int as libc::c_double,
-            h4: 0 as libc::c_int as libc::c_double,
-            n1: 0 as libc::c_int,
-            n2: 0 as libc::c_int,
-            n3: 0 as libc::c_int,
-            t0: 0 as libc::c_int as libc::c_double,
-            gs: 0 as libc::c_int as libc::c_double,
-            tol: 0 as libc::c_int as libc::c_double,
-            line: 0 as libc::c_int,
-            alpha: 0 as libc::c_int as libc::c_double,
-            iexact: 0 as libc::c_int,
-            incons: 0 as libc::c_int,
-            ireset: 0 as libc::c_int,
-            itermx: 0 as libc::c_int,
-            x0: 0 as *mut libc::c_double,
-        };
-        init
+    let mut state: slsqpb_state = slsqpb_state {
+        t: 0 as libc::c_int as libc::c_double,
+        f0: 0 as libc::c_int as libc::c_double,
+        h1: 0 as libc::c_int as libc::c_double,
+        h2: 0 as libc::c_int as libc::c_double,
+        h3: 0 as libc::c_int as libc::c_double,
+        h4: 0 as libc::c_int as libc::c_double,
+        n1: 0 as libc::c_int,
+        n2: 0 as libc::c_int,
+        n3: 0 as libc::c_int,
+        t0: 0 as libc::c_int as libc::c_double,
+        gs: 0 as libc::c_int as libc::c_double,
+        tol: 0 as libc::c_int as libc::c_double,
+        line: 0 as libc::c_int,
+        alpha: 0 as libc::c_int as libc::c_double,
+        iexact: 0 as libc::c_int,
+        incons: 0 as libc::c_int,
+        ireset: 0 as libc::c_int,
+        itermx: 0 as libc::c_int,
+        x0: 0 as *mut libc::c_double,
     };
+
     let mut mtot: libc::c_uint = nlopt_count_constraints(m, fc);
     let mut ptot: libc::c_uint = nlopt_count_constraints(p, h);
     let mut work: *mut libc::c_double = 0 as *mut libc::c_double;
@@ -3875,7 +3863,8 @@ pub unsafe fn nlopt_slsqp(
                             current_block = 8507021683849773288;
                             break 's_146;
                         }
-                        2 | _ => {
+                        // 2 |
+                        _ => {
                             nlopt_stop_msg(stop, "bug: workspace is too small");
                             ret = NLOPT_INVALID_ARGS;
                             break 'c_6042;
