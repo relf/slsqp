@@ -29,11 +29,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 extern "C" {
     // fn sqrt(_: libc::c_double) -> libc::c_double;
     // fn fabs(_: libc::c_double) -> libc::c_double;
-    fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
-    fn realloc(_: *mut libc::c_void, _: libc::c_ulong) -> *mut libc::c_void;
-    fn free(__ptr: *mut libc::c_void);
-    fn abort() -> !;
-    fn memcpy(_: *mut libc::c_void, _: *const libc::c_void, _: libc::c_ulong) -> *mut libc::c_void;
+    // fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
+    // fn realloc(_: *mut libc::c_void, _: libc::c_ulong) -> *mut libc::c_void;
+    // fn free(__ptr: *mut libc::c_void);
+    // fn abort() -> !;
+    // fn memcpy(_: *mut libc::c_void, _: *const libc::c_void, _: libc::c_ulong) -> *mut libc::c_void;
     // fn strlen(_: *const libc::c_char) -> libc::c_ulong;
     // fn gettimeofday(__tv: *mut timeval, __tz: *mut libc::c_void) -> libc::c_int;
     // fn vsnprintf(
@@ -43,6 +43,11 @@ extern "C" {
     //     _: ::std::ffi::VaList,
     // ) -> libc::c_int;
 }
+
+unsafe fn memcpy(dst: *mut libc::c_void, src: *const libc::c_void, n: libc::c_ulong) {
+    std::ptr::copy_nonoverlapping(src, dst, n as usize);
+}
+
 // pub type __builtin_va_list = [__va_list_tag; 1];
 // #[derive(Copy, Clone)]
 // #[repr(C)]
@@ -587,9 +592,14 @@ pub unsafe fn nlopt_compute_rescaling(
     mut n: libc::c_uint,
     mut dx: *const libc::c_double,
 ) -> *mut libc::c_double {
-    let mut s: *mut libc::c_double = malloc(
-        (::std::mem::size_of::<libc::c_double>() as libc::c_ulong).wrapping_mul(n as libc::c_ulong),
-    ) as *mut libc::c_double;
+    // let mut s: *mut libc::c_double = malloc(
+    //     (::std::mem::size_of::<libc::c_double>() as libc::c_ulong).wrapping_mul(n as libc::c_ulong),
+    // ) as *mut libc::c_double;
+
+    let mut space: Box<Vec<libc::c_double>> = Box::new(vec![0.; usize::try_from(n).unwrap()]);
+    let s = space.as_mut_ptr() as *mut libc::c_double;
+    std::mem::forget(space);
+
     let mut i: libc::c_uint = 0;
     if s.is_null() {
         return 0 as *mut libc::c_double;
@@ -668,9 +678,14 @@ pub unsafe fn nlopt_new_rescaled(
     mut s: *const libc::c_double,
     mut x: *const libc::c_double,
 ) -> *mut libc::c_double {
-    let mut xs: *mut libc::c_double = malloc(
-        (::std::mem::size_of::<libc::c_double>() as libc::c_ulong).wrapping_mul(n as libc::c_ulong),
-    ) as *mut libc::c_double;
+    // let mut xs: *mut libc::c_double = malloc(
+    //     (::std::mem::size_of::<libc::c_double>() as libc::c_ulong).wrapping_mul(n as libc::c_ulong),
+    // ) as *mut libc::c_double;
+
+    let mut space: Box<Vec<libc::c_double>> = Box::new(vec![0.; usize::try_from(n).unwrap()]);
+    let xs = space.as_mut_ptr() as *mut libc::c_double;
+    std::mem::forget(space);
+
     if xs.is_null() {
         return 0 as *mut libc::c_double;
     }
@@ -3591,24 +3606,43 @@ pub unsafe fn nlopt_slsqp(
         nlopt_max_constraint_dim(p, h)
     };
     length_work(&mut len_w, &mut len_jw, mpi, pi, ni);
-    work = malloc(
-        (::std::mem::size_of::<libc::c_double>() as libc::c_ulong)
-            .wrapping_mul(
-                (mpi1 as libc::c_uint)
-                    .wrapping_mul(n.wrapping_add(1 as libc::c_int as libc::c_uint))
-                    .wrapping_add(mpi as libc::c_uint)
-                    .wrapping_add(n)
-                    .wrapping_add(1 as libc::c_int as libc::c_uint)
-                    .wrapping_add(n)
-                    .wrapping_add(n)
-                    .wrapping_add(max_cdim.wrapping_mul(n))
-                    .wrapping_add(len_w as libc::c_uint) as libc::c_ulong,
-            )
-            .wrapping_add(
-                (::std::mem::size_of::<libc::c_int>() as libc::c_ulong)
-                    .wrapping_mul(len_jw as libc::c_uint as libc::c_ulong),
-            ),
-    ) as *mut libc::c_double;
+    // work = malloc(
+    //     (::std::mem::size_of::<libc::c_double>() as libc::c_ulong)
+    //         .wrapping_mul(
+    //             (mpi1 as libc::c_uint)
+    //                 .wrapping_mul(n.wrapping_add(1 as libc::c_int as libc::c_uint))
+    //                 .wrapping_add(mpi as libc::c_uint)
+    //                 .wrapping_add(n)
+    //                 .wrapping_add(1 as libc::c_int as libc::c_uint)
+    //                 .wrapping_add(n)
+    //                 .wrapping_add(n)
+    //                 .wrapping_add(max_cdim.wrapping_mul(n))
+    //                 .wrapping_add(len_w as libc::c_uint) as libc::c_ulong,
+    //         )
+    //         .wrapping_add(
+    //             (::std::mem::size_of::<libc::c_int>() as libc::c_ulong)
+    //                 .wrapping_mul(len_jw as libc::c_uint as libc::c_ulong),
+    //         ),
+    // ) as *mut libc::c_double;
+
+    let space_size = (mpi1 as libc::c_uint)
+        .wrapping_mul(n.wrapping_add(1 as libc::c_int as libc::c_uint))
+        .wrapping_add(mpi as libc::c_uint)
+        .wrapping_add(n)
+        .wrapping_add(1 as libc::c_int as libc::c_uint)
+        .wrapping_add(n)
+        .wrapping_add(n)
+        .wrapping_add(max_cdim.wrapping_mul(n))
+        .wrapping_add(len_w as libc::c_uint);
+    let space_size = space_size.wrapping_add(
+        (::std::mem::size_of::<libc::c_int>() as libc::c_ulong)
+            .wrapping_mul(len_jw as libc::c_uint as libc::c_ulong),
+    );
+    let mut space: Box<Vec<libc::c_double>> =
+        Box::new(vec![0.; usize::try_from(space_size).unwrap()]);
+    work = space.as_mut_ptr() as *mut libc::c_double;
+    std::mem::forget(space);
+
     if work.is_null() {
         return NLOPT_OUT_OF_MEMORY;
     }
@@ -3904,6 +3938,7 @@ pub unsafe fn nlopt_slsqp(
             );
         }
     }
-    free(work as *mut libc::c_void);
+    // free(work as *mut libc::c_void);
+    let _ = Box::from_raw(work);
     return ret;
 }
