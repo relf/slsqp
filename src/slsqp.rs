@@ -3696,11 +3696,8 @@ pub unsafe fn nlopt_slsqp<U>(
         .wrapping_add(n)
         .wrapping_add(n)
         .wrapping_add(max_cdim.wrapping_mul(n))
-        .wrapping_add(len_w as libc::c_uint);
-    let space_size = space_size.wrapping_add(
-        (::std::mem::size_of::<libc::c_int>() as libc::c_ulong)
-            .wrapping_mul(len_jw as libc::c_uint as libc::c_ulong),
-    );
+        .wrapping_add(len_w as libc::c_uint)
+        .wrapping_add(len_jw as libc::c_uint); // size_of(libc::c_double) > size_of(libc::c_int)
     let mut space: Box<Vec<libc::c_double>> =
         Box::new(vec![0.; usize::try_from(space_size).unwrap()]);
     work = space.as_mut_ptr() as *mut libc::c_double;
