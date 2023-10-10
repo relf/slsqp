@@ -4,8 +4,10 @@ mod slsqp;
 
 use crate::slsqp::{
     nlopt_constraint, nlopt_constraint_raw_callback, nlopt_function_raw_callback, nlopt_stopping,
-    NLoptConstraintCfg, NLoptFunctionCfg, NLoptObjFn,
+    NLoptConstraintCfg, NLoptFunctionCfg,
 };
+
+pub use slsqp::Func;
 use std::os::raw::c_void;
 
 /// Failed termination status of the optimization process
@@ -56,7 +58,7 @@ type SuccessOutcome<'a> = (SuccessStatus, &'a [f64], f64);
 /// See also [NLopt SLSQP](https://nlopt.readthedocs.io/en/latest/NLopt_Algorithms/#slsqp) documentation.
 #[allow(clippy::useless_conversion)]
 #[allow(clippy::too_many_arguments)]
-pub fn nlopt_slsqp<'a, F: NLoptObjFn<U>, G: NLoptObjFn<U>, U: Clone>(
+pub fn slsqp<'a, F: Func<U>, G: Func<U>, U: Clone>(
     func: F,
     x0: &'a mut [f64],
     cons: &[G],
@@ -79,7 +81,7 @@ pub fn nlopt_slsqp<'a, F: NLoptObjFn<U>, G: NLoptObjFn<U>, U: Clone>(
         .iter()
         .map(|c| {
             let c_cfg = Box::new(NLoptConstraintCfg {
-                constraint_fn: c as &dyn NLoptObjFn<U>,
+                constraint_fn: c as &dyn Func<U>,
                 user_data: args.clone(), // move user_data into FunctionCfg
             });
             let c_cfg_ptr = Box::into_raw(c_cfg) as *mut c_void;
@@ -251,7 +253,7 @@ mod tests {
     fn test_nlopt_paraboloid() {
         let mut x = vec![1., 1.];
 
-        let mut cons: Vec<&dyn NLoptObjFn<()>> = vec![];
+        let mut cons: Vec<&dyn Func<()>> = vec![];
         let cstr1 = |x: &[f64], gradient: Option<&mut [f64]>, _user_data: &mut ()| {
             if let Some(g) = gradient {
                 g[0] = -1.;
@@ -259,10 +261,10 @@ mod tests {
             }
             -x[0]
         };
-        cons.push(&cstr1 as &dyn NLoptObjFn<()>);
+        cons.push(&cstr1 as &dyn Func<()>);
 
         // x_opt = [0, 0]
-        match nlopt_slsqp(
+        match slsqp(
             nlopt_paraboloid,
             &mut x,
             &cons,
