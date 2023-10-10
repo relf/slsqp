@@ -2,12 +2,13 @@
 
 mod slsqp;
 
+pub use slsqp::Func;
+
 use crate::slsqp::{
     nlopt_constraint, nlopt_constraint_raw_callback, nlopt_function_raw_callback, nlopt_stopping,
     NLoptConstraintCfg, NLoptFunctionCfg,
 };
 
-pub use slsqp::Func;
 use std::os::raw::c_void;
 
 /// Failed termination status of the optimization process
@@ -38,7 +39,6 @@ type FailOutcome<'a> = (FailStatus, &'a [f64], f64);
 type SuccessOutcome<'a> = (SuccessStatus, &'a [f64], f64);
 
 /// Minimizes a function using the SLSQP method.
-/// This implementation is a translation of [NLopt](https://github.com/stevengj/nlopt) 2.7.1
 ///
 /// # Arguments
 ///
@@ -55,10 +55,13 @@ type SuccessOutcome<'a> = (SuccessStatus, &'a [f64], f64);
 ///
 /// The status of the optimization process, the argmin value and the objective function value
 ///
+/// # Implementation note:
+///
+/// This implementation is a translation of [NLopt](https://github.com/stevengj/nlopt) 2.7.1
 /// See also [NLopt SLSQP](https://nlopt.readthedocs.io/en/latest/NLopt_Algorithms/#slsqp) documentation.
 #[allow(clippy::useless_conversion)]
 #[allow(clippy::too_many_arguments)]
-pub fn slsqp<'a, F: Func<U>, G: Func<U>, U: Clone>(
+pub fn minimize<'a, F: Func<U>, G: Func<U>, U: Clone>(
     func: F,
     x0: &'a mut [f64],
     cons: &[G],
@@ -264,7 +267,7 @@ mod tests {
         cons.push(&cstr1 as &dyn Func<()>);
 
         // x_opt = [0, 0]
-        match slsqp(
+        match minimize(
             nlopt_paraboloid,
             &mut x,
             &cons,

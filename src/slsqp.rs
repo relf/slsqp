@@ -71,15 +71,14 @@ pub struct NLoptConstraintCfg<F: Func<T>, T> {
     pub user_data: T,
 }
 
-/// A trait representing an objective function.
+/// A trait representing a function. It is used for objective and constraint functions.
 ///
-/// An objective function takes the form of a closure `f(x: &[f64], gradient: Option<&mut [f64], user_data: &mut U) -> f64`
+/// A function takes the form of a closure `f(x: &[f64], gradient: Option<&mut [f64], user_data: &mut U) -> f64`
 ///
 /// * `x` - `n`-dimensional array
 /// * `gradient` - `n`-dimensional array to store the gradient `grad f(x)`. If `gradient` matches
-/// `Some(x)`, the user is required to provide a gradient, otherwise the optimization will
-/// probabely fail.
-/// * `user_data` - user defined data
+/// `Some(x)`, the user is required to provide a gradient, otherwise the optimization will fail.
+/// * `user_data` - user defined data used to make objective and constraints computations.
 pub trait Func<U>: Fn(&[f64], Option<&mut [f64]>, &mut U) -> f64 {}
 impl<T, U> Func<U> for T where T: Fn(&[f64], Option<&mut [f64]>, &mut U) -> f64 {}
 

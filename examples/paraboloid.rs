@@ -1,4 +1,4 @@
-use slsqp::{slsqp, Func};
+use slsqp::{minimize, Func};
 
 /// Problem cost function
 fn paraboloid(x: &[f64], gradient: Option<&mut [f64]>, _data: &mut ()) -> f64 {
@@ -26,7 +26,7 @@ fn main() {
     cons.push(&cstr1 as &dyn Func<()>);
 
     // x_opt = [0, 0]
-    match slsqp(
+    match minimize(
         paraboloid,
         &mut x,
         &cons,
