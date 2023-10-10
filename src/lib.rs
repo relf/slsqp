@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 mod slsqp;
 
 use crate::slsqp::{
@@ -6,10 +8,52 @@ use crate::slsqp::{
 };
 use std::os::raw::c_void;
 
+/// Failed termination status of the optimization process
+#[derive(Debug, Clone, Copy)]
+pub enum FailStatus {
+    Failure,
+    InvalidArgs,
+    OutOfMemory,
+    RoundoffLimited,
+    ForcedStop,
+    UnexpectedError,
+}
+
+/// Successful termination status of the optimization process
+#[derive(Debug, Clone, Copy)]
+pub enum SuccessStatus {
+    Success,
+    StopValReached,
+    FtolReached,
+    XtolReached,
+    MaxEvalReached,
+    MaxTimeReached,
+}
+
+/// Outcome when optimization process fails
+type FailOutcome<'a> = (FailStatus, &'a [f64], f64);
+/// Outcome when optimization process succeeds
+type SuccessOutcome<'a> = (SuccessStatus, &'a [f64], f64);
+
 /// Minimizes a function using the SLSQP method.
 /// This implementation is a translation of [NLopt](https://github.com/stevengj/nlopt) 2.7.1
 ///
-/// See [NLopt SLSQP](https://nlopt.readthedocs.io/en/latest/NLopt_Algorithms/#slsqp) documentation.
+/// # Arguments
+///
+/// * `func` - the function to minimize
+/// * `x0` - the initial guess (will be matated to reflect the argmin result at the end)
+/// * cons - slice of constraint function intended to be negative at the end
+/// * args - user data pass to objective and constraint functions
+/// * ftol_rel - relative tolerance on function value, algorithm stops when `func(x)` changes by less than `ftol_rel * func(x)`
+/// * ftol_abs - absolute tolerance on function value, algorithm stops when `func(x)` change is less than `ftol_rel`
+/// * xtol_rel - relative tolerance on optimization parameters, algorithm stops when all `x[i]` changes by less than `xtol_rel * x[i]`
+/// * xtol_abs - relative tolerance on optimization parameters, algorithm stops when `x[i]` changes by less than `xtol_abs[i]`
+///     
+/// # Returns
+///
+/// The status of the optimization process, the argmin value and the objective function value
+///
+/// See also [NLopt SLSQP](https://nlopt.readthedocs.io/en/latest/NLopt_Algorithms/#slsqp) documentation.
 #[allow(clippy::useless_conversion)]
 #[allow(clippy::too_many_arguments)]
 pub fn nlopt_slsqp<'a, F: NLoptObjFn<U>, G: NLoptObjFn<U>, U: Clone>(
@@ -17,12 +61,13 @@ pub fn nlopt_slsqp<'a, F: NLoptObjFn<U>, G: NLoptObjFn<U>, U: Clone>(
     x0: &'a mut [f64],
     cons: &[G],
     args: U,
-    rhobeg: f64,
-    rhoend: f64,
-    maxfun: i32,
-    _iprint: i32,
-    bounds: (f64, f64),
-) -> (i32, &'a [f64]) {
+    ftol_rel: f64,
+    ftol_abs: f64,
+    xtol_rel: f64,
+    xtol_abs: &[f64],
+    maxiter: i32,
+    bounds: &[(f64, f64)],
+) -> Result<SuccessOutcome<'a>, FailOutcome<'a>> {
     let fn_cfg = Box::new(NLoptFunctionCfg {
         objective_fn: func,
         user_data: args.clone(), // move user_data into FunctionCfg
@@ -54,9 +99,8 @@ pub fn nlopt_slsqp<'a, F: NLoptObjFn<U>, G: NLoptObjFn<U>, U: Clone>(
     let n = x.len() as u32;
     let m = cons.len() as u32;
 
-    let lb = vec![bounds.0; n as usize];
-    let ub = vec![bounds.1; n as usize];
-    let xtol_abs = vec![0.; n as usize];
+    let lbs: Vec<f64> = bounds.iter().map(|b| b.0).collect();
+    let ubs: Vec<f64> = bounds.iter().map(|b| b.1).collect();
     let x_weights = vec![0.; n as usize];
     let mut minf = f64::INFINITY;
     let mut nevals_p = 0;
@@ -64,70 +108,18 @@ pub fn nlopt_slsqp<'a, F: NLoptObjFn<U>, G: NLoptObjFn<U>, U: Clone>(
     let mut stop = nlopt_stopping {
         n,
         minf_max: -f64::INFINITY,
-        ftol_rel: 1e-4,
-        ftol_abs: 0.0,
-        xtol_rel: rhoend / rhobeg,
+        ftol_rel,
+        ftol_abs,
+        xtol_rel,
         xtol_abs: xtol_abs.as_ptr(),
-        x_weights: x_weights.as_ptr(),
-        nevals_p: &mut nevals_p,
-        maxeval: maxfun.into(),
-        maxtime: 0.0,
-        start: 0.0,
-        force_stop: &mut force_stop,
-        stop_msg: "".to_string(),
+        x_weights: x_weights.as_ptr(), // unused
+        nevals_p: &mut nevals_p,       // unused
+        maxeval: maxiter.into(),
+        maxtime: 0.0,                // unused
+        start: 0.0,                  // unused
+        force_stop: &mut force_stop, // unused
+        stop_msg: "".to_string(),    // unused
     };
-
-    // XXX: Weird bug. Can not pass nlopt_constraint_raw_callback
-    // Work around is to patch nlopt_eval_constraint to use nlopt_constraint_raw_callback directly
-    // if !cons.is_empty() {
-    //     let mut xtest = vec![1., 1.];
-    //     unsafe {
-    //         let mut result = -666.;
-    //         let nc = cstr_cfg[0];
-    //         let fc = &nc as *const nlopt_constraint;
-
-    //         // It works: cstr1 is called
-    //         let _res = nlopt_constraint_raw_callback::<&dyn NLoptObjFn<()>, ()>(
-    //             2,
-    //             xtest.as_mut_ptr(),
-    //             std::ptr::null_mut::<libc::c_double>(),
-    //             (nc).f_data,
-    //         );
-    //         // println!(
-    //         //     "###################################### JUST direct nlopt_constraint_raw_callback is OK = {}",
-    //         //     res,
-    //         // );
-
-    //         // XXX: Weird bug!
-    //         // If fails : (*fc).f does call nlopt_constraint_raw_callback but
-    //         // when unpacking (*fc).f_data with unsafe f = { &mut *(params as *mut NLoptConstraintCfg<F, T>) };
-    //         // (*f).constraint_fn(...) calls the objective function instead of the constraint function!!!
-    //         let _res = ((*fc).f.expect("func"))(
-    //             2,
-    //             xtest.as_mut_ptr(),
-    //             std::ptr::null_mut::<libc::c_double>(),
-    //             (*fc).f_data,
-    //         );
-    //         // println!(
-    //         //     "###################################### JUST stored nlopt_constraint_raw_callback is NOT OK = {}",
-    //         //     res,
-    //         // );
-
-    //         // It works: cstr1 is called
-    //         // we use directly a copy of specialized nlopt_constraint_raw_callback
-    //         nlopt_eval_constraint::<()>(
-    //             &mut result,
-    //             std::ptr::null_mut::<libc::c_double>(),
-    //             fc,
-    //             n,
-    //             x.as_mut_ptr(),
-    //         );
-    //         // println!(
-    //         //     "############################### TEST nlopt_eval_constraint (OK if opposite previous OK result) = {}",
-    //         //     result
-    //         // );
-    //     }
-    // }
 
     let status = unsafe {
         slsqp::nlopt_slsqp::<U>(
@@ -138,8 +130,8 @@ pub fn nlopt_slsqp<'a, F: NLoptObjFn<U>, G: NLoptObjFn<U>, U: Clone>(
             cstr_cfg.as_mut_ptr(),
             0,
             std::ptr::null_mut(),
-            lb.as_ptr(),
-            ub.as_ptr(),
+            lbs.as_ptr(),
+            ubs.as_ptr(),
             x.as_mut_ptr(),
             &mut minf,
             &mut stop,
@@ -151,7 +143,21 @@ pub fn nlopt_slsqp<'a, F: NLoptObjFn<U>, G: NLoptObjFn<U>, U: Clone>(
     unsafe {
         let _ = Box::from_raw(fn_cfg_ptr as *mut NLoptFunctionCfg<F, U>);
     };
-    (status, x)
+
+    match status {
+        -1 => Err((FailStatus::Failure, x, minf)),
+        -2 => Err((FailStatus::InvalidArgs, x, minf)),
+        -3 => Err((FailStatus::OutOfMemory, x, minf)),
+        -4 => Err((FailStatus::RoundoffLimited, x, minf)),
+        -5 => Err((FailStatus::ForcedStop, x, minf)),
+        1 => Ok((SuccessStatus::Success, x, minf)),
+        2 => Ok((SuccessStatus::StopValReached, x, minf)),
+        3 => Ok((SuccessStatus::FtolReached, x, minf)),
+        4 => Ok((SuccessStatus::XtolReached, x, minf)),
+        5 => Ok((SuccessStatus::MaxEvalReached, x, minf)),
+        6 => Ok((SuccessStatus::MaxTimeReached, x, minf)),
+        _ => Err((FailStatus::UnexpectedError, x, minf)),
+    }
 }
 
 #[cfg(test)]
@@ -256,19 +262,25 @@ mod tests {
         cons.push(&cstr1 as &dyn NLoptObjFn<()>);
 
         // x_opt = [0, 0]
-        let (status, x_opt) = nlopt_slsqp(
+        match nlopt_slsqp(
             nlopt_paraboloid,
             &mut x,
             &cons,
             (),
-            0.5,
+            1e-4,
             0.0,
+            0.0,
+            &[0.0, 0.0],
             200,
-            1,
-            (-10., 10.),
-        );
-        println!("status = {}", status);
-        println!("x = {:?}", x_opt);
+            &[(-10., 10.)],
+        ) {
+            Ok((status, x_opt, y_opt)) => {
+                println!("status = {:?}", status);
+                println!("x_opt = {:?}", x_opt);
+                println!("y_opt = {}", y_opt);
+            }
+            Err((e, _, _)) => println!("Optim error: {:?}", e),
+        }
 
         assert_abs_diff_eq!(x.as_slice(), [0., 0.].as_slice(), epsilon = 1e-3);
     }
