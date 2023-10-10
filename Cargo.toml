@@ -8,7 +8,7 @@ description = "SLSQP optimizer for Rust"
 readme = "README.md"
 repository = "https://github.com/relf/slsqp/"
 keywords = ["optimizer", "optimization", "constrained"]
-categories = ["algorithms", "api-bindings", "science"]
+categories = ["algorithms", "science"]
 documentation = "https://docs.rs/slsqp"
 
 [dependencies]
