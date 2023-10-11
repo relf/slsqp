@@ -13,7 +13,7 @@ fn paraboloid(x: &[f64], gradient: Option<&mut [f64]>, _data: &mut ()) -> f64 {
 }
 
 fn main() {
-    let mut x = vec![1., 1.];
+    let x = vec![1., 1.];
 
     let mut cons: Vec<&dyn Func<()>> = vec![];
     let cstr1 = |x: &[f64], gradient: Option<&mut [f64]>, _user_data: &mut ()| {
@@ -28,15 +28,15 @@ fn main() {
     // x_opt = [0, 0]
     match minimize(
         paraboloid,
-        &mut x,
+        &x,
         &cons,
         (),
+        200,
         &[(-10., 10.)],
         1e-4,
         0.0,
         0.0,
         &[0.0, 0.0],
-        200,
     ) {
         Ok((status, x_opt, y_opt)) => {
             println!("status = {:?}", status);

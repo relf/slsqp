@@ -43,19 +43,16 @@ type SuccessOutcome = (SuccessStatus, Vec<f64>, f64);
 /// # Arguments
 ///
 /// * `func` - the function to minimize
-/// * `x0` - the initial guess (will be matated to reflect the argmin result at the end)
+/// * `xinit` - n-vector the initial guess
 /// * `cons` - slice of constraint function intended to be negative at the end
 /// * `args` - user data pass to objective and constraint functions
 /// * `bounds` - x domain specified as a n-vector of tuple `(lower bound, upper bound)`  
-/// * `ftol_rel` - relative tolerance on function value, algorithm stops when `func(x)` changes by less than `ftol_rel * func(x)`
-/// * `ftol_abs` - absolute tolerance on function value, algorithm stops when `func(x)` change is less than `ftol_rel`
-/// * `xtol_rel` - relative tolerance on optimization parameters, algorithm stops when all `x[i]` changes by less than `xtol_rel * x[i]`
-/// * `xtol_abs` - relative tolerance on optimization parameters, algorithm stops when `x[i]` changes by less than `xtol_abs[i]`
 /// * `maxeval` - maximum number of objective function evaluation
 ///     
 /// # Returns
 ///
 /// The status of the optimization process, the argmin value and the objective function value
+///
 ///
 /// # Implementation note:
 ///
@@ -63,17 +60,17 @@ type SuccessOutcome = (SuccessStatus, Vec<f64>, f64);
 /// See also [NLopt SLSQP](https://nlopt.readthedocs.io/en/latest/NLopt_Algorithms/#slsqp) documentation.
 #[allow(clippy::useless_conversion)]
 #[allow(clippy::too_many_arguments)]
-pub fn minimize<'a, F: Func<U>, G: Func<U>, U: Clone>(
+pub fn minimize<F: Func<U>, G: Func<U>, U: Clone>(
     func: F,
     xinit: &[f64],
     cons: &[G],
     args: U,
+    maxeval: usize,
     bounds: &[(f64, f64)],
     ftol_rel: f64,
     ftol_abs: f64,
     xtol_rel: f64,
     xtol_abs: &[f64],
-    maxiter: usize,
 ) -> Result<SuccessOutcome, FailOutcome> {
     let fn_cfg = Box::new(NLoptFunctionCfg {
         objective_fn: func,
@@ -122,7 +119,7 @@ pub fn minimize<'a, F: Func<U>, G: Func<U>, U: Clone>(
         xtol_abs: xtol_abs.as_ptr(),
         x_weights: x_weights.as_ptr(), // unused
         nevals_p: &mut nevals_p,       // unused
-        maxeval: maxiter as i32,
+        maxeval: maxeval as i32,
         maxtime: 0.0,                // unused
         start: 0.0,                  // unused
         force_stop: &mut force_stop, // unused
@@ -275,12 +272,12 @@ mod tests {
             &xinit,
             &cons,
             (),
+            200,
             &[(-10., 10.)],
             1e-4,
             0.0,
             0.0,
             &[0.0, 0.0],
-            200,
         ) {
             Ok((_, x, _)) => {
                 let exp = [0., 0.];
