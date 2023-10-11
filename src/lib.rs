@@ -44,15 +44,14 @@ type SuccessOutcome = (SuccessStatus, Vec<f64>, f64);
 ///
 /// * `func` - the function to minimize
 /// * `xinit` - n-vector the initial guess
+/// * `bounds` - x domain specified as a n-vector of tuple `(lower bound, upper bound)`  
 /// * `cons` - slice of constraint function intended to be negative at the end
 /// * `args` - user data pass to objective and constraint functions
-/// * `bounds` - x domain specified as a n-vector of tuple `(lower bound, upper bound)`  
 /// * `maxeval` - maximum number of objective function evaluation
 ///     
 /// # Returns
 ///
 /// The status of the optimization process, the argmin value and the objective function value
-///
 ///
 /// # Implementation note:
 ///
@@ -63,10 +62,10 @@ type SuccessOutcome = (SuccessStatus, Vec<f64>, f64);
 pub fn minimize<F: Func<U>, G: Func<U>, U: Clone>(
     func: F,
     xinit: &[f64],
+    bounds: &[(f64, f64)],
     cons: &[G],
     args: U,
     maxeval: usize,
-    bounds: &[(f64, f64)],
     ftol_rel: f64,
     ftol_abs: f64,
     xtol_rel: f64,
@@ -84,7 +83,7 @@ pub fn minimize<F: Func<U>, G: Func<U>, U: Clone>(
         .map(|c| {
             let c_cfg = Box::new(NLoptConstraintCfg {
                 constraint_fn: c as &dyn Func<U>,
-                user_data: args.clone(), // move user_data into FunctionCfg
+                user_data: args.clone(),
             });
             let c_cfg_ptr = Box::into_raw(c_cfg) as *mut c_void;
 
@@ -104,6 +103,16 @@ pub fn minimize<F: Func<U>, G: Func<U>, U: Clone>(
     let n = x.len() as u32;
     let m = cons.len() as u32;
 
+    if bounds.len() != x.len() {
+        panic!(
+            "{}",
+            format!(
+                "Minimize Error: Bounds and x should have same size! Got {} for bounds and {} for x.",
+                bounds.len(),
+                x.len()
+            )
+        )
+    }
     let lbs: Vec<f64> = bounds.iter().map(|b| b.0).collect();
     let ubs: Vec<f64> = bounds.iter().map(|b| b.1).collect();
     let x_weights = vec![0.; n as usize];
@@ -270,10 +279,10 @@ mod tests {
         match minimize(
             paraboloid,
             &xinit,
+            &[(-10., 10.), (-10., 10.)],
             &cons,
             (),
             200,
-            &[(-10., 10.)],
             1e-4,
             0.0,
             0.0,
