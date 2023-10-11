@@ -2,7 +2,6 @@ use slsqp::{minimize, Func};
 
 /// Objective function
 fn paraboloid(x: &[f64], gradient: Option<&mut [f64]>, _data: &mut ()) -> f64 {
-    println!("{:?}", x);
     let r1 = x[0] + 1.0;
     let r2 = x[1];
     if let Some(g) = gradient {

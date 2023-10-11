@@ -82,17 +82,30 @@ pub struct StopTols {
 /// ## Example
 /// ```
 /// # use approx::assert_abs_diff_eq;
-/// use slsqp::{minimize, Func, RhoBeg};
+/// use slsqp::{minimize, Func};
 ///
-/// fn paraboloid(x: &[f64], _data: &mut ()) -> f64 {
-///     10. * (x[0] + 1.).powf(2.) + x[1].powf(2.)
+/// fn paraboloid(x: &[f64], gradient: Option<&mut [f64]>, _data: &mut ()) -> f64 {
+///     let r1 = x[0] + 1.0;
+///     let r2 = x[1];
+///     if let Some(g) = gradient {
+///         g[0] = 20.0 * r1;
+///         g[1] = 2. * r2;
+///     }
+///     10. * r1 * r1 + r2 * r2
 /// }
 ///
+/// // Initial guess
 /// let mut x = vec![1., 1.];
 ///
 /// // Constraints definition to be negative eventually: here `x_0 > 0`
 /// // hence the `-x[0]` value returned below
-/// let cstr1 = |x: &[f64], _user_data: &mut ()| -x[0];
+/// let cstr1 = |x: &[f64], gradient: Option<&mut [f64]>, _user_data: &mut ()| {
+///     if let Some(g) = gradient {
+///         g[0] = -1.;
+///         g[1] = 0.;
+///     }
+///     -x[0]
+/// };
 /// let cons: Vec<&dyn Func<()>> = vec![&cstr1];
 ///
 /// match minimize(
