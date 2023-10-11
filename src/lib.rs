@@ -38,6 +38,28 @@ type FailOutcome = (FailStatus, Vec<f64>, f64);
 /// Outcome when optimization process succeeds
 type SuccessOutcome = (SuccessStatus, Vec<f64>, f64);
 
+/// Tolerances used as termination criteria.
+/// For all, condition is disabled if value is not strictly positive.
+/// ```rust
+/// # use crate::slsqp::StopTols;
+/// let stop_tol = StopTols {
+///     ftol_rel: 1e-4,
+///     xtol_abs: vec![1e-3; 3],   // size should be equal to x dim
+///     ..StopTols::default()      // default stop conditions are disabled
+/// };  
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct StopTols {
+    /// Relative tolerance on function value, algorithm stops when `func(x)` changes by less than `ftol_rel * func(x)`
+    pub ftol_rel: f64,
+    /// Absolute tolerance on function value, algorithm stops when `func(x)` change is less than `ftol_rel`
+    pub ftol_abs: f64,
+    /// Relative tolerance on optimization parameters, algorithm stops when all `x[i]` changes by less than `xtol_rel * x[i]`
+    pub xtol_rel: f64,
+    /// Relative tolerance on optimization parameters, algorithm stops when `x[i]` changes by less than `xtol_abs[i]`
+    pub xtol_abs: Vec<f64>,
+}
+
 /// Minimizes a function using the SLSQP method.
 ///
 /// # Arguments
@@ -49,11 +71,50 @@ type SuccessOutcome = (SuccessStatus, Vec<f64>, f64);
 /// * `args` - user data pass to objective and constraint functions
 /// * `maxeval` - maximum number of objective function evaluation
 ///     
-/// # Returns
+/// ## Returns
 ///
 /// The status of the optimization process, the argmin value and the objective function value
 ///
-/// # Implementation note:
+/// ## Panics
+///
+/// When some vector arguments like `bounds`, `xtol_abs` do not have the same size as `xinit`
+///
+/// ## Example
+/// ```
+/// # use approx::assert_abs_diff_eq;
+/// use slsqp::{minimize, Func, RhoBeg};
+///
+/// fn paraboloid(x: &[f64], _data: &mut ()) -> f64 {
+///     10. * (x[0] + 1.).powf(2.) + x[1].powf(2.)
+/// }
+///
+/// let mut x = vec![1., 1.];
+///
+/// // Constraints definition to be negative eventually: here `x_0 > 0`
+/// // hence the `-x[0]` value returned below
+/// let cstr1 = |x: &[f64], _user_data: &mut ()| -x[0];
+/// let cons: Vec<&dyn Func<()>> = vec![&cstr1];
+///
+/// match minimize(
+///     paraboloid,
+///     &mut x,
+///     &[(-10., 10.), (-10., 10.)],
+///     &cons,
+///     (),
+///     200,
+///     None
+/// ) {
+///     Ok((status, x_opt, y_opt)) => {
+///         println!("status = {:?}", status);
+///         println!("x_opt = {:?}", x_opt);
+///         println!("y_opt = {}", y_opt);
+/// #        assert_abs_diff_eq!(y_opt, 10.0);
+///     }
+///     Err((e, _, _)) => println!("Optim error: {:?}", e),
+/// }
+/// ```
+///
+/// ## Implementation note:
 ///
 /// This implementation is a translation of [NLopt](https://github.com/stevengj/nlopt) 2.7.1
 /// See also [NLopt SLSQP](https://nlopt.readthedocs.io/en/latest/NLopt_Algorithms/#slsqp) documentation.
@@ -66,10 +127,7 @@ pub fn minimize<F: Func<U>, G: Func<U>, U: Clone>(
     cons: &[G],
     args: U,
     maxeval: usize,
-    ftol_rel: f64,
-    ftol_abs: f64,
-    xtol_rel: f64,
-    xtol_abs: &[f64],
+    stop_tol: Option<StopTols>,
 ) -> Result<SuccessOutcome, FailOutcome> {
     let fn_cfg = Box::new(NLoptFunctionCfg {
         objective_fn: func,
@@ -115,17 +173,34 @@ pub fn minimize<F: Func<U>, G: Func<U>, U: Clone>(
     }
     let lbs: Vec<f64> = bounds.iter().map(|b| b.0).collect();
     let ubs: Vec<f64> = bounds.iter().map(|b| b.1).collect();
+
     let x_weights = vec![0.; n as usize];
     let mut minf = f64::INFINITY;
     let mut nevals_p = 0;
     let mut force_stop = 0;
+
+    let stop_tol = stop_tol.unwrap_or_default();
+    let xtol_abs = if stop_tol.xtol_abs.is_empty() {
+        std::ptr::null()
+    } else if stop_tol.xtol_abs.len() != n as usize {
+        panic!(
+            "{}",
+            format!(
+                "Minimize Error: xtol_abs should have x dim size ({}), got {}",
+                n,
+                stop_tol.xtol_abs.len()
+            )
+        );
+    } else {
+        stop_tol.xtol_abs.as_ptr()
+    };
     let mut stop = nlopt_stopping {
         n,
         minf_max: -f64::INFINITY,
-        ftol_rel,
-        ftol_abs,
-        xtol_rel,
-        xtol_abs: xtol_abs.as_ptr(),
+        ftol_rel: stop_tol.ftol_rel,
+        ftol_abs: stop_tol.ftol_abs,
+        xtol_rel: stop_tol.xtol_rel,
+        xtol_abs,
         x_weights: x_weights.as_ptr(), // unused
         nevals_p: &mut nevals_p,       // unused
         maxeval: maxeval as i32,
@@ -275,6 +350,11 @@ mod tests {
         };
         cons.push(&cstr1 as &dyn Func<()>);
 
+        let stop_tol = StopTols {
+            ftol_rel: 1e-4,
+            ..StopTols::default()
+        };
+
         // x_opt = [0, 0]
         match minimize(
             paraboloid,
@@ -283,10 +363,7 @@ mod tests {
             &cons,
             (),
             200,
-            1e-4,
-            0.0,
-            0.0,
-            &[0.0, 0.0],
+            Some(stop_tol),
         ) {
             Ok((_, x, _)) => {
                 let exp = [0., 0.];
