@@ -34,9 +34,9 @@ pub enum SuccessStatus {
 }
 
 /// Outcome when optimization process fails
-type FailOutcome<'a> = (FailStatus, &'a [f64], f64);
+type FailOutcome = (FailStatus, Vec<f64>, f64);
 /// Outcome when optimization process succeeds
-type SuccessOutcome<'a> = (SuccessStatus, &'a [f64], f64);
+type SuccessOutcome = (SuccessStatus, Vec<f64>, f64);
 
 /// Minimizes a function using the SLSQP method.
 ///
@@ -44,12 +44,14 @@ type SuccessOutcome<'a> = (SuccessStatus, &'a [f64], f64);
 ///
 /// * `func` - the function to minimize
 /// * `x0` - the initial guess (will be matated to reflect the argmin result at the end)
-/// * cons - slice of constraint function intended to be negative at the end
-/// * args - user data pass to objective and constraint functions
-/// * ftol_rel - relative tolerance on function value, algorithm stops when `func(x)` changes by less than `ftol_rel * func(x)`
-/// * ftol_abs - absolute tolerance on function value, algorithm stops when `func(x)` change is less than `ftol_rel`
-/// * xtol_rel - relative tolerance on optimization parameters, algorithm stops when all `x[i]` changes by less than `xtol_rel * x[i]`
-/// * xtol_abs - relative tolerance on optimization parameters, algorithm stops when `x[i]` changes by less than `xtol_abs[i]`
+/// * `cons` - slice of constraint function intended to be negative at the end
+/// * `args` - user data pass to objective and constraint functions
+/// * `bounds` - x domain specified as a n-vector of tuple `(lower bound, upper bound)`  
+/// * `ftol_rel` - relative tolerance on function value, algorithm stops when `func(x)` changes by less than `ftol_rel * func(x)`
+/// * `ftol_abs` - absolute tolerance on function value, algorithm stops when `func(x)` change is less than `ftol_rel`
+/// * `xtol_rel` - relative tolerance on optimization parameters, algorithm stops when all `x[i]` changes by less than `xtol_rel * x[i]`
+/// * `xtol_abs` - relative tolerance on optimization parameters, algorithm stops when `x[i]` changes by less than `xtol_abs[i]`
+/// * `maxeval` - maximum number of objective function evaluation
 ///     
 /// # Returns
 ///
@@ -63,16 +65,16 @@ type SuccessOutcome<'a> = (SuccessStatus, &'a [f64], f64);
 #[allow(clippy::too_many_arguments)]
 pub fn minimize<'a, F: Func<U>, G: Func<U>, U: Clone>(
     func: F,
-    x0: &'a mut [f64],
+    xinit: &[f64],
     cons: &[G],
     args: U,
+    bounds: &[(f64, f64)],
     ftol_rel: f64,
     ftol_abs: f64,
     xtol_rel: f64,
     xtol_abs: &[f64],
-    maxiter: i32,
-    bounds: &[(f64, f64)],
-) -> Result<SuccessOutcome<'a>, FailOutcome<'a>> {
+    maxiter: usize,
+) -> Result<SuccessOutcome, FailOutcome> {
     let fn_cfg = Box::new(NLoptFunctionCfg {
         objective_fn: func,
         user_data: args.clone(), // move user_data into FunctionCfg
@@ -100,7 +102,8 @@ pub fn minimize<'a, F: Func<U>, G: Func<U>, U: Clone>(
         })
         .collect::<Vec<_>>();
 
-    let x = x0;
+    let mut x = vec![0.; xinit.len()];
+    x.copy_from_slice(xinit);
     let n = x.len() as u32;
     let m = cons.len() as u32;
 
@@ -119,7 +122,7 @@ pub fn minimize<'a, F: Func<U>, G: Func<U>, U: Clone>(
         xtol_abs: xtol_abs.as_ptr(),
         x_weights: x_weights.as_ptr(), // unused
         nevals_p: &mut nevals_p,       // unused
-        maxeval: maxiter.into(),
+        maxeval: maxiter as i32,
         maxtime: 0.0,                // unused
         start: 0.0,                  // unused
         force_stop: &mut force_stop, // unused
@@ -174,7 +177,7 @@ mod tests {
     ////////////////////////////////////////////////////////////////////////////////
     /// Nlopt slsqp
 
-    fn nlopt_raw_paraboloid(
+    fn raw_paraboloid(
         _n: libc::c_uint,
         x: *const libc::c_double,
         gradient: *mut libc::c_double,
@@ -194,7 +197,7 @@ mod tests {
     }
 
     #[test]
-    fn test_nlopt_slsqp_minimize() {
+    fn test_slsqp_minimize() {
         let mut x = vec![1., 1.];
         let mut lb = vec![-10.0, -10.0];
         let mut ub = vec![10.0, 10.0];
@@ -221,7 +224,7 @@ mod tests {
         let res = unsafe {
             slsqp::nlopt_slsqp::<()>(
                 2,
-                Some(nlopt_raw_paraboloid),
+                Some(raw_paraboloid),
                 std::ptr::null_mut(),
                 0,
                 std::ptr::null_mut(),
@@ -241,7 +244,7 @@ mod tests {
         assert_abs_diff_eq!(x.as_slice(), [-1., 0.].as_slice(), epsilon = 1e-4);
     }
 
-    fn nlopt_paraboloid(x: &[f64], gradient: Option<&mut [f64]>, _data: &mut ()) -> f64 {
+    fn paraboloid(x: &[f64], gradient: Option<&mut [f64]>, _data: &mut ()) -> f64 {
         println!("{:?}", x);
         let r1 = x[0] + 1.0;
         let r2 = x[1];
@@ -253,8 +256,8 @@ mod tests {
     }
 
     #[test]
-    fn test_nlopt_paraboloid() {
-        let mut x = vec![1., 1.];
+    fn test_paraboloid() {
+        let xinit = vec![1., 1.];
 
         let mut cons: Vec<&dyn Func<()>> = vec![];
         let cstr1 = |x: &[f64], gradient: Option<&mut [f64]>, _user_data: &mut ()| {
@@ -268,25 +271,26 @@ mod tests {
 
         // x_opt = [0, 0]
         match minimize(
-            nlopt_paraboloid,
-            &mut x,
+            paraboloid,
+            &xinit,
             &cons,
             (),
+            &[(-10., 10.)],
             1e-4,
             0.0,
             0.0,
             &[0.0, 0.0],
             200,
-            &[(-10., 10.)],
         ) {
-            Ok((status, x_opt, y_opt)) => {
-                println!("status = {:?}", status);
-                println!("x_opt = {:?}", x_opt);
-                println!("y_opt = {}", y_opt);
+            Ok((_, x, _)) => {
+                let exp = [0., 0.];
+                for (act, exp) in x.iter().zip(exp.iter()) {
+                    assert_abs_diff_eq!(act, exp, epsilon = 1e-3);
+                }
             }
-            Err((e, _, _)) => println!("Optim error: {:?}", e),
+            Err((status, _, _)) => {
+                panic!("{}", format!("Error status : {:?}", status));
+            }
         }
-
-        assert_abs_diff_eq!(x.as_slice(), [0., 0.].as_slice(), epsilon = 1e-3);
     }
 }

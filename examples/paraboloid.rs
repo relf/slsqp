@@ -31,12 +31,12 @@ fn main() {
         &mut x,
         &cons,
         (),
+        &[(-10., 10.)],
         1e-4,
         0.0,
         0.0,
         &[0.0, 0.0],
         200,
-        &[(-10., 10.)],
     ) {
         Ok((status, x_opt, y_opt)) => {
             println!("status = {:?}", status);
