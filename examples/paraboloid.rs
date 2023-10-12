@@ -1,8 +1,7 @@
 use slsqp::{minimize, Func};
 
-/// Problem cost function
+/// Objective function
 fn paraboloid(x: &[f64], gradient: Option<&mut [f64]>, _data: &mut ()) -> f64 {
-    println!("{:?}", x);
     let r1 = x[0] + 1.0;
     let r2 = x[1];
     if let Some(g) = gradient {
@@ -13,8 +12,11 @@ fn paraboloid(x: &[f64], gradient: Option<&mut [f64]>, _data: &mut ()) -> f64 {
 }
 
 fn main() {
-    let mut x = vec![1., 1.];
+    // Initial guess
+    let xinit = vec![1., 1.];
 
+    // Define a constraint: x0 > 0
+    // Remember constraints are defined to be negative in the end hence the returned value `-x[0]`
     let mut cons: Vec<&dyn Func<()>> = vec![];
     let cstr1 = |x: &[f64], gradient: Option<&mut [f64]>, _user_data: &mut ()| {
         if let Some(g) = gradient {
@@ -28,15 +30,12 @@ fn main() {
     // x_opt = [0, 0]
     match minimize(
         paraboloid,
-        &mut x,
+        &xinit,
+        &[(-10., 10.), (-10., 10.)],
         &cons,
         (),
-        1e-4,
-        0.0,
-        0.0,
-        &[0.0, 0.0],
         200,
-        &[(-10., 10.)],
+        None,
     ) {
         Ok((status, x_opt, y_opt)) => {
             println!("status = {:?}", status);
