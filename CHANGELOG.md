@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-## [0.1.0] - 2023-10-19
+## [0.1.1] - 2023-10-19
 
 * Fix default constraint tolerance (set to zero, was 2e-4) 
 
