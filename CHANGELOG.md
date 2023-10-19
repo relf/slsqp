@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.1.0] - 2023-10-19
+
+* Fix default constraint tolerance (set to zero, was 2e-4) 
+
 ## [0.1.0] - 2023-10-13
 
 SLSQP optimizer in Rust (SLSQP stands for Sequential Least SQuares Programming). 
