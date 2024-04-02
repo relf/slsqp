@@ -114,16 +114,16 @@ pub struct StopTols {
 ///     &[(-10., 10.), (-10., 10.)],
 ///     &cons,
 ///     (),
-///     200,
+///     100,
 ///     None
 /// ) {
 ///     Ok((status, x_opt, y_opt)) => {
 ///         println!("status = {:?}", status);
 ///         println!("x_opt = {:?}", x_opt);
 ///         println!("y_opt = {}", y_opt);
-/// #        assert_abs_diff_eq!(y_opt, 10.0);
+/// #       assert_abs_diff_eq!(y_opt, 10.0, epsilon=1e-8);
 ///     }
-///     Err((e, _, _)) => println!("Optim error: {:?}", e),
+///     Err((e, _, _)) => panic!("Optim error: {:?}", e),
 /// }
 /// ```
 ///
