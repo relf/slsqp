@@ -1,6 +1,6 @@
 # slsqp - a pure Rust implementation
 
-[![tests](https://github.com/relf/cobyla/actions/workflows/tests.yml/badge.svg)](https://github.com/relf/cobyla/actions/workflows/tests.yml)
+[![tests](https://github.com/relf/slsqp/actions/workflows/tests.yml/badge.svg)](https://github.com/relf/slsqp/actions/workflows/tests.yml)
 [![crates.io](https://img.shields.io/crates/v/slsqp)](https://crates.io/crates/slsqp)
 [![docs](https://docs.rs/slsqp/badge.svg)](https://docs.rs/slsqp)
 
@@ -10,7 +10,7 @@ SLSQP is a sequential quadratic programming algorithm for nonlinearly constraine
   > Dieter Kraft, "Algorithm 733: TOMP–Fortran modules for optimal control calculations," ACM Transactions on Mathematical Software, vol. 20, no. 3, pp. 262-281 (1994).
 
 The Rust code was generated/adapted from the C code from the [NLopt](https://github.com/stevengj/nlopt) project (version 2.7.1).
-The algorithme is available here as a `minimize` function. 
+The algorithme is available here as a `minimize` function.
 An initial transpilation was done with [c2rust](https://github.com/immunant/c2rust) then the code was manually edited to make it work. The callback mechanism is inspired from the Rust binding of NLopt, namely [rust-nlopt](https://github.com/adwhit/rust-nlopt).
 
 ## Example
@@ -22,10 +22,8 @@ cargo run --example paraboloid
 ## Related projects
 
 * [rust-nlopt](https://github.com/adwhit/rust-nlopt): the Rust binding of the [NLopt project](https://nlopt.readthedocs.io)
-* [cobyla](https://github.com/relf/cobyla): a pure Rust implementation of the COBYLA algorithm. 
+* [cobyla](https://github.com/relf/cobyla): a pure Rust implementation of the COBYLA algorithm.
 
 ## License
 
 The project is released under MIT License.
-
-
