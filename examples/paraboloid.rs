@@ -1,4 +1,4 @@
-use slsqp::{minimize, Func};
+use slsqp::{minimize, Func, StopTols};
 
 /// Objective function
 fn paraboloid(x: &[f64], gradient: Option<&mut [f64]>, _data: &mut ()) -> f64 {
@@ -27,6 +27,12 @@ fn main() {
     };
     cons.push(&cstr1 as &dyn Func<()>);
 
+    // Terminate when relative change (Df/f) is less than 1e-4
+    let stop_tol = StopTols {
+        ftol_rel: 1e-4,
+        ..StopTols::default()
+    };
+
     // x_opt = [0, 0]
     match minimize(
         paraboloid,
@@ -34,14 +40,16 @@ fn main() {
         &[(-10., 10.), (-10., 10.)],
         &cons,
         (),
-        200,
-        None,
+        200,            // 100,
+        Some(stop_tol), // None,
     ) {
         Ok((status, x_opt, y_opt)) => {
             println!("status = {:?}", status);
             println!("x_opt = {:?}", x_opt);
             println!("y_opt = {}", y_opt);
         }
-        Err((e, _, _)) => println!("Optim error: {:?}", e),
+        Err((e, x_opt, y_opt)) => {
+            println!("Optim error: {:?}, x={:?} fmin={}", e, x_opt, y_opt)
+        }
     }
 }
