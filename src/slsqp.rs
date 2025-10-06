@@ -103,9 +103,9 @@ impl<T, U> Func<U> for T where T: Fn(&[f64], Option<&mut [f64]>, &mut U) -> f64 
 // ) -> libc::c_int;
 //}
 
-unsafe fn memcpy(dst: *mut libc::c_void, src: *const libc::c_void, n: libc::c_ulong) {
+unsafe fn memcpy(dst: *mut libc::c_void, src: *const libc::c_void, n: libc::c_ulong) { unsafe {
     std::ptr::copy_nonoverlapping(src, dst, n as usize);
-}
+}}
 
 // pub type __builtin_va_list = [__va_list_tag; 1];
 // #[derive(Copy, Clone)]
@@ -231,7 +231,7 @@ unsafe fn nlopt_time_seed() -> libc::c_ulong {
     since_the_epoch.as_millis() as libc::c_ulong
 }
 
-unsafe fn nlopt_seconds() -> libc::c_double {
+unsafe fn nlopt_seconds() -> libc::c_double { unsafe {
     // static mut start_inited: libc::c_int = 0 as libc::c_int;
     // static mut start: libc::timeval = libc::timeval {
     //     tv_sec: 0,
@@ -258,7 +258,7 @@ unsafe fn nlopt_seconds() -> libc::c_double {
         .duration_since(UNIX_EPOCH)
         .expect("Time flies")
         .as_secs_f64()
-}
+}}
 unsafe fn sc(
     mut x: libc::c_double,
     mut smin: libc::c_double,
@@ -272,7 +272,7 @@ unsafe fn vector_norm(
     mut w: *const libc::c_double,
     mut scale_min: *const libc::c_double,
     mut scale_max: *const libc::c_double,
-) -> libc::c_double {
+) -> libc::c_double { unsafe {
     let mut i: libc::c_uint = 0;
     let mut ret: libc::c_double = 0 as libc::c_int as libc::c_double;
     if !scale_min.is_null() && !scale_max.is_null() {
@@ -314,7 +314,7 @@ unsafe fn vector_norm(
         }
     }
     return ret;
-}
+}}
 unsafe fn diff_norm(
     mut n: libc::c_uint,
     mut x: *const libc::c_double,
@@ -322,7 +322,7 @@ unsafe fn diff_norm(
     mut w: *const libc::c_double,
     mut scale_min: *const libc::c_double,
     mut scale_max: *const libc::c_double,
-) -> libc::c_double {
+) -> libc::c_double { unsafe {
     let mut i: libc::c_uint = 0;
     let mut ret: libc::c_double = 0 as libc::c_int as libc::c_double;
     if !scale_min.is_null() && !scale_max.is_null() {
@@ -372,42 +372,42 @@ unsafe fn diff_norm(
         }
     }
     return ret;
-}
+}}
 unsafe fn relstop(
     mut vold: libc::c_double,
     mut vnew: libc::c_double,
     mut reltol: libc::c_double,
     mut abstol: libc::c_double,
-) -> libc::c_int {
+) -> libc::c_int { unsafe {
     if nlopt_isinf(vold) != 0 {
         return 0 as libc::c_int;
     }
     return ((vnew - vold).abs() < abstol
         || (vnew - vold).abs() < reltol * ((vnew).abs() + (vold).abs()) * 0.5f64
         || reltol > 0 as libc::c_int as libc::c_double && vnew == vold) as libc::c_int;
-}
+}}
 
 unsafe fn nlopt_stop_ftol(
     mut s: *const nlopt_stopping,
     mut f: libc::c_double,
     mut oldf: libc::c_double,
-) -> libc::c_int {
+) -> libc::c_int { unsafe {
     return relstop(oldf, f, (*s).ftol_rel, (*s).ftol_abs);
-}
+}}
 
 unsafe fn nlopt_stop_f(
     mut s: *const nlopt_stopping,
     mut f: libc::c_double,
     mut oldf: libc::c_double,
-) -> libc::c_int {
+) -> libc::c_int { unsafe {
     return (f <= (*s).minf_max || nlopt_stop_ftol(s, f, oldf) != 0) as libc::c_int;
-}
+}}
 
 unsafe fn nlopt_stop_x(
     mut s: *const nlopt_stopping,
     mut x: *const libc::c_double,
     mut oldx: *const libc::c_double,
-) -> libc::c_int {
+) -> libc::c_int { unsafe {
     let mut i: libc::c_uint = 0;
     if diff_norm(
         (*s).n,
@@ -440,13 +440,13 @@ unsafe fn nlopt_stop_x(
         i = i.wrapping_add(1);
     }
     return 1 as libc::c_int;
-}
+}}
 
 unsafe fn nlopt_stop_dx(
     mut s: *const nlopt_stopping,
     mut x: *const libc::c_double,
     mut dx: *const libc::c_double,
-) -> libc::c_int {
+) -> libc::c_int { unsafe {
     let mut i: libc::c_uint = 0;
     if vector_norm(
         (*s).n,
@@ -476,7 +476,7 @@ unsafe fn nlopt_stop_dx(
         i = i.wrapping_add(1);
     }
     return 1 as libc::c_int;
-}
+}}
 
 unsafe fn nlopt_stop_xs(
     mut s: *const nlopt_stopping,
@@ -484,7 +484,7 @@ unsafe fn nlopt_stop_xs(
     mut oldxs: *const libc::c_double,
     mut scale_min: *const libc::c_double,
     mut scale_max: *const libc::c_double,
-) -> libc::c_int {
+) -> libc::c_int { unsafe {
     let mut i: libc::c_uint = 0;
     if diff_norm((*s).n, xs, oldxs, (*s).x_weights, scale_min, scale_max)
         < (*s).xtol_rel * vector_norm((*s).n, xs, (*s).x_weights, scale_min, scale_max)
@@ -513,7 +513,7 @@ unsafe fn nlopt_stop_xs(
         i = i.wrapping_add(1);
     }
     return 1 as libc::c_int;
-}
+}}
 
 unsafe fn nlopt_isfinite(mut x: libc::c_double) -> libc::c_int {
     return ((x).abs() <= 1.7976931348623157e+308f64) as libc::c_int;
@@ -531,26 +531,26 @@ unsafe fn nlopt_isnan(mut x: libc::c_double) -> libc::c_int {
     return x.is_nan() as i32;
 }
 
-unsafe fn nlopt_stop_evals(mut s: *const nlopt_stopping) -> libc::c_int {
+unsafe fn nlopt_stop_evals(mut s: *const nlopt_stopping) -> libc::c_int { unsafe {
     return ((*s).maxeval > 0 as libc::c_int && *(*s).nevals_p >= (*s).maxeval) as libc::c_int;
-}
+}}
 
-unsafe fn nlopt_stop_time_(mut start: libc::c_double, mut maxtime: libc::c_double) -> libc::c_int {
+unsafe fn nlopt_stop_time_(mut start: libc::c_double, mut maxtime: libc::c_double) -> libc::c_int { unsafe {
     return (maxtime > 0 as libc::c_int as libc::c_double && nlopt_seconds() - start >= maxtime)
         as libc::c_int;
-}
+}}
 
-unsafe fn nlopt_stop_time(mut s: *const nlopt_stopping) -> libc::c_int {
+unsafe fn nlopt_stop_time(mut s: *const nlopt_stopping) -> libc::c_int { unsafe {
     return nlopt_stop_time_((*s).start, (*s).maxtime);
-}
+}}
 
-unsafe fn nlopt_stop_evalstime(mut stop: *const nlopt_stopping) -> libc::c_int {
+unsafe fn nlopt_stop_evalstime(mut stop: *const nlopt_stopping) -> libc::c_int { unsafe {
     return (nlopt_stop_evals(stop) != 0 || nlopt_stop_time(stop) != 0) as libc::c_int;
-}
+}}
 
-unsafe fn nlopt_stop_forced(mut stop: *const nlopt_stopping) -> libc::c_int {
+unsafe fn nlopt_stop_forced(mut stop: *const nlopt_stopping) -> libc::c_int { unsafe {
     return (!((*stop).force_stop).is_null() && *(*stop).force_stop != 0) as libc::c_int;
-}
+}}
 //
 // pub unsafe fn nlopt_vsprintf(
 //     mut p: *mut libc::c_char,
@@ -582,14 +582,14 @@ unsafe fn nlopt_stop_forced(mut stop: *const nlopt_stopping) -> libc::c_int {
 //     return p;
 // }
 
-unsafe fn nlopt_stop_msg(mut s: *mut nlopt_stopping, msg: &str) {
+unsafe fn nlopt_stop_msg(mut s: *mut nlopt_stopping, msg: &str) { unsafe {
     (*s).stop_msg = msg.to_string();
-}
+}}
 
 unsafe fn nlopt_count_constraints(
     mut p: libc::c_uint,
     mut c: *const nlopt_constraint,
-) -> libc::c_uint {
+) -> libc::c_uint { unsafe {
     let mut i: libc::c_uint = 0;
     let mut count: libc::c_uint = 0 as libc::c_int as libc::c_uint;
     i = 0 as libc::c_int as libc::c_uint;
@@ -598,12 +598,12 @@ unsafe fn nlopt_count_constraints(
         i = i.wrapping_add(1);
     }
     return count;
-}
+}}
 
 unsafe fn nlopt_max_constraint_dim(
     mut p: libc::c_uint,
     mut c: *const nlopt_constraint,
-) -> libc::c_uint {
+) -> libc::c_uint { unsafe {
     let mut i: libc::c_uint = 0;
     let mut max_dim: libc::c_uint = 0 as libc::c_int as libc::c_uint;
     i = 0 as libc::c_int as libc::c_uint;
@@ -614,7 +614,7 @@ unsafe fn nlopt_max_constraint_dim(
         i = i.wrapping_add(1);
     }
     return max_dim;
-}
+}}
 
 unsafe fn nlopt_eval_constraint<U>(
     mut result: *mut libc::c_double,
@@ -622,7 +622,7 @@ unsafe fn nlopt_eval_constraint<U>(
     mut c: *const nlopt_constraint,
     mut n: libc::c_uint,
     mut x: *const libc::c_double,
-) {
+) { unsafe {
     if ((*c).f).is_some() {
         *result.offset(0 as libc::c_int as isize) =
         // PATCH Weird bug ((*c).f).expect("non-null function pointer") calls the objective function!!!
@@ -633,7 +633,7 @@ unsafe fn nlopt_eval_constraint<U>(
     } else {
         ((*c).mf).expect("non-null function pointer")((*c).m, result, n, x, grad, (*c).f_data);
     };
-}
+}}
 
 unsafe fn nlopt_isinf(mut x: libc::c_double) -> libc::c_int {
     return ((x).abs() >= f64::INFINITY * 0.99f64
@@ -651,7 +651,7 @@ unsafe fn nlopt_isinf(mut x: libc::c_double) -> libc::c_int {
 unsafe fn nlopt_compute_rescaling(
     mut n: libc::c_uint,
     mut dx: *const libc::c_double,
-) -> *mut libc::c_double {
+) -> *mut libc::c_double { unsafe {
     // let mut s: *mut libc::c_double = malloc(
     //     (::std::mem::size_of::<libc::c_double>() as libc::c_ulong).wrapping_mul(n as libc::c_ulong),
     // ) as *mut libc::c_double;
@@ -687,14 +687,14 @@ unsafe fn nlopt_compute_rescaling(
         }
     }
     return s;
-}
+}}
 
 unsafe fn nlopt_rescale(
     mut n: libc::c_uint,
     mut s: *const libc::c_double,
     mut x: *const libc::c_double,
     mut xs: *mut libc::c_double,
-) {
+) { unsafe {
     let mut i: libc::c_uint = 0;
     if s.is_null() {
         i = 0 as libc::c_int as libc::c_uint;
@@ -709,14 +709,14 @@ unsafe fn nlopt_rescale(
             i = i.wrapping_add(1);
         }
     };
-}
+}}
 
 unsafe fn nlopt_unscale(
     mut n: libc::c_uint,
     mut s: *const libc::c_double,
     mut x: *const libc::c_double,
     mut xs: *mut libc::c_double,
-) {
+) { unsafe {
     let mut i: libc::c_uint = 0;
     if s.is_null() {
         i = 0 as libc::c_int as libc::c_uint;
@@ -731,13 +731,13 @@ unsafe fn nlopt_unscale(
             i = i.wrapping_add(1);
         }
     };
-}
+}}
 
 unsafe fn nlopt_new_rescaled(
     mut n: libc::c_uint,
     mut s: *const libc::c_double,
     mut x: *const libc::c_double,
-) -> *mut libc::c_double {
+) -> *mut libc::c_double { unsafe {
     // let mut xs: *mut libc::c_double = malloc(
     //     (::std::mem::size_of::<libc::c_double>() as libc::c_ulong).wrapping_mul(n as libc::c_ulong),
     // ) as *mut libc::c_double;
@@ -751,13 +751,13 @@ unsafe fn nlopt_new_rescaled(
     }
     nlopt_rescale(n, s, x, xs);
     return xs;
-}
+}}
 
 unsafe fn nlopt_reorder_bounds(
     mut n: libc::c_uint,
     mut lb: *mut libc::c_double,
     mut ub: *mut libc::c_double,
-) {
+) { unsafe {
     let mut i: libc::c_uint = 0;
     i = 0 as libc::c_int as libc::c_uint;
     while i < n {
@@ -768,14 +768,14 @@ unsafe fn nlopt_reorder_bounds(
         }
         i = i.wrapping_add(1);
     }
-}
+}}
 unsafe fn dcopy___(
     mut n_: *mut libc::c_int,
     mut dx: *const libc::c_double,
     mut incx: libc::c_int,
     mut dy: *mut libc::c_double,
     mut incy: libc::c_int,
-) {
+) { unsafe {
     let mut i: libc::c_int = 0;
     let mut n: libc::c_int = *n_;
     if n <= 0 as libc::c_int {
@@ -802,7 +802,7 @@ unsafe fn dcopy___(
             i += 1;
         }
     };
-}
+}}
 unsafe fn daxpy_sl__(
     mut n_: *mut libc::c_int,
     mut da_: *const libc::c_double,
@@ -810,7 +810,7 @@ unsafe fn daxpy_sl__(
     mut incx: libc::c_int,
     mut dy: *mut libc::c_double,
     mut incy: libc::c_int,
-) {
+) { unsafe {
     let mut n: libc::c_int = *n_;
     let mut i: libc::c_int = 0;
     let mut da: libc::c_double = *da_;
@@ -822,14 +822,14 @@ unsafe fn daxpy_sl__(
         *dy.offset((i * incy) as isize) += da * *dx.offset((i * incx) as isize);
         i += 1;
     }
-}
+}}
 unsafe fn ddot_sl__(
     mut n_: *mut libc::c_int,
     mut dx: *mut libc::c_double,
     mut incx: libc::c_int,
     mut dy: *mut libc::c_double,
     mut incy: libc::c_int,
-) -> libc::c_double {
+) -> libc::c_double { unsafe {
     let mut n: libc::c_int = *n_;
     let mut i: libc::c_int = 0;
     let mut sum: libc::c_double = 0 as libc::c_int as libc::c_double;
@@ -842,12 +842,12 @@ unsafe fn ddot_sl__(
         i += 1;
     }
     return sum;
-}
+}}
 unsafe fn dnrm2___(
     mut n_: *mut libc::c_int,
     mut dx: *mut libc::c_double,
     mut incx: libc::c_int,
-) -> libc::c_double {
+) -> libc::c_double { unsafe {
     let mut i: libc::c_int = 0;
     let mut n: libc::c_int = *n_;
     let mut xmax: libc::c_double = 0 as libc::c_int as libc::c_double;
@@ -872,7 +872,7 @@ unsafe fn dnrm2___(
         i += 1;
     }
     return xmax * sum.sqrt();
-}
+}}
 unsafe fn dsrot_(
     mut n: libc::c_int,
     mut dx: *mut libc::c_double,
@@ -881,7 +881,7 @@ unsafe fn dsrot_(
     mut incy: libc::c_int,
     mut c__: *mut libc::c_double,
     mut s_: *mut libc::c_double,
-) {
+) { unsafe {
     let mut i: libc::c_int = 0;
     let mut c: libc::c_double = *c__;
     let mut s: libc::c_double = *s_;
@@ -893,13 +893,13 @@ unsafe fn dsrot_(
         *dy.offset((incy * i) as isize) = c * y - s * x;
         i += 1;
     }
-}
+}}
 unsafe fn dsrotg_(
     mut da: *mut libc::c_double,
     mut db: *mut libc::c_double,
     mut c: *mut libc::c_double,
     mut s: *mut libc::c_double,
-) {
+) { unsafe {
     let mut absa: libc::c_double = 0.;
     let mut absb: libc::c_double = 0.;
     let mut roe: libc::c_double = 0.;
@@ -937,13 +937,13 @@ unsafe fn dsrotg_(
         *da = *db;
         *s = *da;
     };
-}
+}}
 unsafe fn dscal_sl__(
     mut n_: *mut libc::c_int,
     mut da: *const libc::c_double,
     mut dx: *mut libc::c_double,
     mut incx: libc::c_int,
-) {
+) { unsafe {
     let mut i: libc::c_int = 0;
     let mut n: libc::c_int = *n_;
     let mut alpha: libc::c_double = *da;
@@ -952,7 +952,7 @@ unsafe fn dscal_sl__(
         *dx.offset((i * incx) as isize) *= alpha;
         i += 1;
     }
-}
+}}
 static mut c__0: libc::c_int = 0 as libc::c_int;
 static mut c__1: libc::c_int = 1 as libc::c_int;
 static mut c__2: libc::c_int = 2 as libc::c_int;
@@ -968,7 +968,7 @@ unsafe fn h12_(
     mut ice: *const libc::c_int,
     mut icv: *const libc::c_int,
     mut ncv: *const libc::c_int,
-) {
+) { unsafe {
     let mut current_block: u64;
     let one: libc::c_double = 1.0f64;
     let mut u_dim1: libc::c_int = 0;
@@ -1073,7 +1073,7 @@ unsafe fn h12_(
             }
         }
     }
-}
+}}
 unsafe fn nnls_(
     mut a: *mut libc::c_double,
     mut mda: *mut libc::c_int,
@@ -1086,7 +1086,7 @@ unsafe fn nnls_(
     mut z__: *mut libc::c_double,
     mut indx: *mut libc::c_int,
     mut mode: *mut libc::c_int,
-) {
+) { unsafe {
     let mut current_block: u64;
     let one: libc::c_double = 1.0f64;
     let factor: libc::c_double = 0.01f64;
@@ -1419,7 +1419,7 @@ unsafe fn nnls_(
             );
         }
     }
-}
+}}
 unsafe fn ldp_(
     mut g: *mut libc::c_double,
     mut mg: *mut libc::c_int,
@@ -1431,7 +1431,7 @@ unsafe fn ldp_(
     mut w: *mut libc::c_double,
     mut indx: *mut libc::c_int,
     mut mode: *mut libc::c_int,
-) {
+) { unsafe {
     let one: libc::c_double = 1.0f64;
     let mut g_dim1: libc::c_int = 0;
     let mut g_offset: libc::c_int = 0;
@@ -1563,7 +1563,7 @@ unsafe fn ldp_(
             }
         }
     }
-}
+}}
 unsafe fn lsi_(
     mut e: *mut libc::c_double,
     mut f: *mut libc::c_double,
@@ -1579,7 +1579,7 @@ unsafe fn lsi_(
     mut w: *mut libc::c_double,
     mut jw: *mut libc::c_int,
     mut mode: *mut libc::c_int,
-) {
+) { unsafe {
     let mut current_block: u64;
     let epmach: libc::c_double = 2.22e-16f64;
     let one: libc::c_double = 1.0f64;
@@ -1726,7 +1726,7 @@ unsafe fn lsi_(
         }
         _ => {}
     };
-}
+}}
 unsafe fn hfti_(
     mut a: *mut libc::c_double,
     mut mda: *mut libc::c_int,
@@ -1741,7 +1741,7 @@ unsafe fn hfti_(
     mut h__: *mut libc::c_double,
     mut g: *mut libc::c_double,
     mut ip: *mut libc::c_int,
-) {
+) { unsafe {
     let mut current_block: u64;
     let factor: libc::c_double = 0.001f64;
     let mut a_dim1: libc::c_int = 0;
@@ -1998,7 +1998,7 @@ unsafe fn hfti_(
         }
     }
     *krank = k;
-}
+}}
 unsafe fn lsei_(
     mut c__: *mut libc::c_double,
     mut d__: *mut libc::c_double,
@@ -2018,7 +2018,7 @@ unsafe fn lsei_(
     mut w: *mut libc::c_double,
     mut jw: *mut libc::c_int,
     mut mode: *mut libc::c_int,
-) {
+) { unsafe {
     let mut current_block: u64;
     let epmach: libc::c_double = 2.22e-16f64;
     let mut c_dim1: libc::c_int = 0;
@@ -2344,7 +2344,7 @@ unsafe fn lsei_(
             }
         }
     }
-}
+}}
 unsafe fn lsq_(
     mut m: *mut libc::c_int,
     mut meq: *mut libc::c_int,
@@ -2362,7 +2362,7 @@ unsafe fn lsq_(
     mut w: *mut libc::c_double,
     mut jw: *mut libc::c_int,
     mut mode: *mut libc::c_int,
-) {
+) { unsafe {
     let one: libc::c_double = 1.0f64;
     let mut a_dim1: libc::c_int = 0;
     let mut a_offset: libc::c_int = 0;
@@ -2650,14 +2650,14 @@ unsafe fn lsq_(
             i__ += 1;
         }
     }
-}
+}}
 unsafe fn ldl_(
     mut n: *mut libc::c_int,
     mut a: *mut libc::c_double,
     mut z__: *mut libc::c_double,
     mut sigma: *mut libc::c_double,
     mut w: *mut libc::c_double,
-) {
+) { unsafe {
     let one: libc::c_double = 1.0f64;
     let four: libc::c_double = 4.0f64;
     let epmach: libc::c_double = 2.22e-16f64;
@@ -2758,7 +2758,7 @@ unsafe fn ldl_(
             i__ += 1;
         }
     }
-}
+}}
 unsafe fn slsqpb_(
     mut m: *mut libc::c_int,
     mut meq: *mut libc::c_int,
@@ -2784,7 +2784,7 @@ unsafe fn slsqpb_(
     mut w: *mut libc::c_double,
     mut iw: *mut libc::c_int,
     mut state: *mut slsqpb_state,
-) {
+) { unsafe {
     let mut current_block: u64;
     let one: libc::c_double = 1.0f64;
     let alfmin: libc::c_double = 0.1f64;
@@ -3439,7 +3439,7 @@ unsafe fn slsqpb_(
             }
         }
     }
-}
+}}
 unsafe fn slsqp(
     mut m: *mut libc::c_int,
     mut meq: *mut libc::c_int,
@@ -3460,7 +3460,7 @@ unsafe fn slsqp(
     mut jw: *mut libc::c_int,
     mut l_jw__: *mut libc::c_int,
     mut state: *mut slsqpb_state,
-) {
+) { unsafe {
     let mut a_dim1: libc::c_int = 0;
     let mut a_offset: libc::c_int = 0;
     let mut i__1: libc::c_int = 0;
@@ -3563,14 +3563,14 @@ unsafe fn slsqp(
     );
     let ref mut fresh1 = (*state).x0;
     *fresh1 = &mut *w.offset(ix as isize) as *mut libc::c_double;
-}
+}}
 unsafe fn length_work(
     mut LEN_W: *mut libc::c_int,
     mut LEN_JW: *mut libc::c_int,
     mut M: libc::c_int,
     mut MEQ: libc::c_int,
     mut N: libc::c_int,
-) {
+) { unsafe {
     let mut N1: libc::c_int = N + 1 as libc::c_int;
     let mut MINEQ: libc::c_int = M - MEQ + N1 + N1;
     *LEN_W = (3 as libc::c_int * N1 + M) * (N1 + 1 as libc::c_int)
@@ -3585,7 +3585,7 @@ unsafe fn length_work(
         + 3 as libc::c_int * N1
         + 1 as libc::c_int;
     *LEN_JW = MINEQ;
-}
+}}
 
 pub(crate) unsafe fn nlopt_slsqp<U>(
     mut n: libc::c_uint,
@@ -3600,7 +3600,7 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
     mut x: *mut libc::c_double,
     mut minf: *mut libc::c_double,
     mut stop: *mut nlopt_stopping,
-) -> nlopt_result {
+) -> nlopt_result { unsafe {
     let mut current_block: u64;
     let mut state: slsqpb_state = slsqpb_state {
         t: 0 as libc::c_int as libc::c_double,
@@ -3998,4 +3998,4 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
     // free(work as *mut libc::c_void);
     let _ = Box::from_raw(work);
     return ret;
-}
+}}
