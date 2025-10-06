@@ -389,4 +389,32 @@ mod tests {
             }
         }
     }
+
+    fn xsinx(x: &[f64], gradient: Option<&mut [f64]>, _user_data: &mut ()) -> f64 {
+        let r = (x[0] - 3.5) / std::f64::consts::PI;
+        if let Some(g) = gradient {
+            g[0] = f64::sin(r) + (x[0] - 3.5) * f64::cos(r) / std::f64::consts::PI;
+        }
+        (x[0] - 3.5) * f64::sin(r)
+    }
+
+    #[test]
+    fn test_xsinx() {
+        let xinit = vec![10.];
+
+        let cons: Vec<&dyn Func<()>> = vec![];
+
+        // x_opt = [18.9352]
+        match minimize(xsinx, &xinit, &[(0., 25.)], &cons, (), 200, None) {
+            Ok((_, x, _)) => {
+                let exp = [18.9352];
+                for (act, exp) in x.iter().zip(exp.iter()) {
+                    assert_abs_diff_eq!(act, exp, epsilon = 1e-3);
+                }
+            }
+            Err((status, _, _)) => {
+                panic!("{}", format!("Error status : {:?}", status));
+            }
+        }
+    }
 }
