@@ -2,7 +2,7 @@
 authors = ["Remi Lafage <remi.lafage@onera.fr>"]
 name = "slsqp"
 version = "0.1.1"
-edition = "2021"
+edition = "2024"
 license-file = "LICENSE.md"
 description = "SLSQP optimizer for Rust"
 readme = "README.md"
