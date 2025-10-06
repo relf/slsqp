@@ -6,6 +6,7 @@
     non_upper_case_globals,
     unused_assignments,
     unused_mut,
+    static_mut_refs,
     clippy::needless_return,
     clippy::zero_ptr,
     clippy::toplevel_ref_arg,
@@ -77,7 +78,7 @@ pub(crate) struct NLoptConstraintCfg<F: Func<T>, T> {
 ///
 /// * `x` - `n`-dimensional array
 /// * `gradient` - `n`-dimensional array to store the gradient `grad f(x)`. If `gradient` matches
-/// `Some(x)`, the user is required to provide a gradient, otherwise the optimization will fail.
+///   `Some(x)`, the user is required to provide a gradient, otherwise the optimization will fail.
 /// * `user_data` - user defined data used to make objective and constraints computations.
 pub trait Func<U>: Fn(&[f64], Option<&mut [f64]>, &mut U) -> f64 {}
 impl<T, U> Func<U> for T where T: Fn(&[f64], Option<&mut [f64]>, &mut U) -> f64 {}
@@ -635,7 +636,7 @@ unsafe fn nlopt_eval_constraint<U>(
 }
 
 unsafe fn nlopt_isinf(mut x: libc::c_double) -> libc::c_int {
-    return ((x).abs() >= ::std::f64::INFINITY * 0.99f64
+    return ((x).abs() >= f64::INFINITY * 0.99f64
         || if x.is_infinite() {
             if x.is_sign_positive() {
                 1
@@ -3655,8 +3656,8 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
     let mut ret: nlopt_result = NLOPT_SUCCESS;
     let mut feasible: libc::c_int = 0;
     let mut feasible_cur: libc::c_int = 0;
-    let mut infeasibility: libc::c_double = ::std::f64::INFINITY;
-    let mut infeasibility_cur: libc::c_double = ::std::f64::INFINITY;
+    let mut infeasibility: libc::c_double = f64::INFINITY;
+    let mut infeasibility_cur: libc::c_double = f64::INFINITY;
     let mut max_cdim: libc::c_uint = 0;
     let mut want_grad: libc::c_int = 1 as libc::c_int;
     max_cdim = if nlopt_max_constraint_dim(m, fc) >= nlopt_max_constraint_dim(p, h) {
@@ -3723,7 +3724,7 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
         x as *const libc::c_void,
         (::std::mem::size_of::<libc::c_double>() as libc::c_ulong).wrapping_mul(n as libc::c_ulong),
     );
-    *minf = ::std::f64::INFINITY;
+    *minf = f64::INFINITY;
     fcur = *minf;
     fprev = fcur;
     feasible_cur = 0 as libc::c_int;
@@ -3743,7 +3744,7 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
             let ref mut fresh2 = *(*stop).nevals_p;
             *fresh2 += 1;
             if nlopt_stop_forced(stop) != 0 {
-                fcur = ::std::f64::INFINITY;
+                fcur = f64::INFINITY;
                 ret = NLOPT_FORCED_STOP;
                 break 'c_6042;
             } else {

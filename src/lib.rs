@@ -268,9 +268,6 @@ mod tests {
 
     use super::*;
 
-    ////////////////////////////////////////////////////////////////////////////////
-    /// Nlopt slsqp
-
     fn raw_paraboloid(
         _n: libc::c_uint,
         x: *const libc::c_double,
