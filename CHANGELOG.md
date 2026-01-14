@@ -4,7 +4,7 @@
 
 ## [1.0.0] - 2026-01-14
 
-* BUmp version to 1.0.0
+* Bump version to 1.0.0
 * Use Edition 2024
 
 ## [0.1.1] - 2023-10-19
