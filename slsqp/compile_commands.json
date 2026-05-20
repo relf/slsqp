@@ -1,7 +1,7 @@
 [
 {
-  "directory": "/home/rlafage/workspace/slsqp/build",
-  "command": "/usr/bin/cc  -I/home/rlafage/workspace/slsqp/slsqp    -o CMakeFiles/slsqp.dir/slsqp.c.o   -c /home/rlafage/workspace/slsqp/slsqp/slsqp.c",
-  "file": "/home/rlafage/workspace/slsqp/slsqp/slsqp.c"
+  "directory": "/tmp_user/juno/rlafage/workspace/slsqp/build",
+  "command": "/usr/bin/cc  -I/tmp_user/juno/rlafage/workspace/slsqp/slsqp  -o CMakeFiles/slsqp.dir/slsqp.c.o -c /tmp_user/juno/rlafage/workspace/slsqp/slsqp/slsqp.c",
+  "file": "/tmp_user/juno/rlafage/workspace/slsqp/slsqp/slsqp.c"
 }
 ]
