@@ -1253,7 +1253,7 @@ static void lsq_(int *m, int *meq, int *n, int *nl,
 	     im, ip, iu, iw;
     double diag;
     int mineq;
-    double xnorm;
+    double xnorm = 0.0;
 
 /*   MINIMIZE with respect to X */
 /*             ||E*X - F|| */
@@ -2463,6 +2463,11 @@ nlopt_result nlopt_slsqp(unsigned n, nlopt_func f, void *f_data,
      unsigned max_cdim;
      int want_grad = 1;
      
+     if (ptot > n) {
+       nlopt_stop_msg(stop, "slsqp: more equality constraints than variables");
+       return NLOPT_INVALID_ARGS;
+     }
+
      max_cdim = MAX2(nlopt_max_constraint_dim(m, fc),
 		    nlopt_max_constraint_dim(p, h));
      length_work(&len_w, &len_jw, mpi, pi, ni);
@@ -2609,7 +2614,7 @@ nlopt_result nlopt_slsqp(unsigned n, nlopt_func f, void *f_data,
 	  /* note: mode == -1 corresponds to the completion of a line search,
 	     and is the only time we should check convergence (as in original slsqp code) */
 	  if (mode == -1) {
-	       if (!nlopt_isinf(fprev) && feasible) {
+	       if (!nlopt_isinf(fprev) && feasible_cur) {
 		    if (nlopt_stop_ftol(stop, fcur, fprev))
 			 ret = NLOPT_FTOL_REACHED;
 		    else if (nlopt_stop_x(stop, xcur, xprev))
