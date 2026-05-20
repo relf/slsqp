@@ -11,8 +11,5 @@ keywords = ["optimizer", "optimization", "constrained"]
 categories = ["algorithms", "science"]
 documentation = "https://docs.rs/slsqp"
 
-[dependencies]
-libc = "0.2"
-
 [dev-dependencies]
 approx = "0.5"
