@@ -7,6 +7,7 @@
     unused_assignments,
     unused_mut,
     static_mut_refs,
+    unsafe_op_in_unsafe_fn,
     clippy::needless_return,
     clippy::zero_ptr,
     clippy::toplevel_ref_arg,
@@ -40,8 +41,6 @@ pub(crate) fn nlopt_function_raw_callback<F: Func<T>, T>(
     // recover FunctionCfg object from supplied params and call
     let f = unsafe { &mut *(params as *mut NLoptFunctionCfg<F, T>) };
     let res = (f.objective_fn)(argument, gradient, &mut f.user_data);
-    #[allow(forgetting_references)]
-    std::mem::forget(f);
     res
 }
 
@@ -272,12 +271,12 @@ unsafe fn vector_norm(
     mut w: *const ::core::ffi::c_double,
     mut scale_min: *const ::core::ffi::c_double,
     mut scale_max: *const ::core::ffi::c_double,
-) -> ::core::ffi::c_double { unsafe {
+) -> ::core::ffi::c_double {
     let mut i: ::core::ffi::c_uint = 0;
     let mut ret: ::core::ffi::c_double = 0 as ::core::ffi::c_int as ::core::ffi::c_double;
     if !scale_min.is_null() && !scale_max.is_null() {
         if !w.is_null() {
-            i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+            i = 0 as ::core::ffi::c_uint;
             while i < n {
                 ret += *w.offset(i as isize)
                     * (sc(
@@ -289,7 +288,7 @@ unsafe fn vector_norm(
                 i = i.wrapping_add(1);
             }
         } else {
-            i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+            i = 0 as ::core::ffi::c_uint;
             while i < n {
                 ret += (sc(
                     *vec.offset(i as isize),
@@ -301,20 +300,20 @@ unsafe fn vector_norm(
             }
         }
     } else if !w.is_null() {
-        i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+        i = 0 as ::core::ffi::c_uint;
         while i < n {
             ret += *w.offset(i as isize) * (*vec.offset(i as isize)).abs();
             i = i.wrapping_add(1);
         }
     } else {
-        i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+        i = 0 as ::core::ffi::c_uint;
         while i < n {
             ret += (*vec.offset(i as isize)).abs();
             i = i.wrapping_add(1);
         }
     }
     return ret;
-}}
+}
 unsafe fn diff_norm(
     mut n: ::core::ffi::c_uint,
     mut x: *const ::core::ffi::c_double,
@@ -322,12 +321,12 @@ unsafe fn diff_norm(
     mut w: *const ::core::ffi::c_double,
     mut scale_min: *const ::core::ffi::c_double,
     mut scale_max: *const ::core::ffi::c_double,
-) -> ::core::ffi::c_double { unsafe {
+) -> ::core::ffi::c_double {
     let mut i: ::core::ffi::c_uint = 0;
     let mut ret: ::core::ffi::c_double = 0 as ::core::ffi::c_int as ::core::ffi::c_double;
     if !scale_min.is_null() && !scale_max.is_null() {
         if !w.is_null() {
-            i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+            i = 0 as ::core::ffi::c_uint;
             while i < n {
                 ret += *w.offset(i as isize)
                     * (sc(
@@ -343,7 +342,7 @@ unsafe fn diff_norm(
                 i = i.wrapping_add(1);
             }
         } else {
-            i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+            i = 0 as ::core::ffi::c_uint;
             while i < n {
                 ret += (sc(
                     *x.offset(i as isize),
@@ -359,78 +358,78 @@ unsafe fn diff_norm(
             }
         }
     } else if !w.is_null() {
-        i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+        i = 0 as ::core::ffi::c_uint;
         while i < n {
             ret += *w.offset(i as isize) * (*x.offset(i as isize) - *oldx.offset(i as isize)).abs();
             i = i.wrapping_add(1);
         }
     } else {
-        i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+        i = 0 as ::core::ffi::c_uint;
         while i < n {
             ret += (*x.offset(i as isize) - *oldx.offset(i as isize)).abs();
             i = i.wrapping_add(1);
         }
     }
     return ret;
-}}
+}
 unsafe fn relstop(
     mut vold: ::core::ffi::c_double,
     mut vnew: ::core::ffi::c_double,
     mut reltol: ::core::ffi::c_double,
     mut abstol: ::core::ffi::c_double,
-) -> ::core::ffi::c_int { unsafe {
+) -> ::core::ffi::c_int {
     if nlopt_isinf(vold) != 0 {
         return 0 as ::core::ffi::c_int;
     }
     return ((vnew - vold).abs() < abstol
         || (vnew - vold).abs() < reltol * ((vnew).abs() + (vold).abs()) * 0.5f64
         || reltol > 0 as ::core::ffi::c_int as ::core::ffi::c_double && vnew == vold) as ::core::ffi::c_int;
-}}
+}
 
 unsafe fn nlopt_stop_ftol(
     mut s: *const nlopt_stopping,
     mut f: ::core::ffi::c_double,
     mut oldf: ::core::ffi::c_double,
-) -> ::core::ffi::c_int { unsafe {
+) -> ::core::ffi::c_int {
     return relstop(oldf, f, (*s).ftol_rel, (*s).ftol_abs);
-}}
+}
 
 unsafe fn nlopt_stop_f(
     mut s: *const nlopt_stopping,
     mut f: ::core::ffi::c_double,
     mut oldf: ::core::ffi::c_double,
-) -> ::core::ffi::c_int { unsafe {
+) -> ::core::ffi::c_int {
     return (f <= (*s).minf_max || nlopt_stop_ftol(s, f, oldf) != 0) as ::core::ffi::c_int;
-}}
+}
 
 unsafe fn nlopt_stop_x(
     mut s: *const nlopt_stopping,
     mut x: *const ::core::ffi::c_double,
     mut oldx: *const ::core::ffi::c_double,
-) -> ::core::ffi::c_int { unsafe {
+) -> ::core::ffi::c_int {
     let mut i: ::core::ffi::c_uint = 0;
     if diff_norm(
         (*s).n,
         x,
         oldx,
         (*s).x_weights,
-        0 as *const ::core::ffi::c_double,
-        0 as *const ::core::ffi::c_double,
+        ::core::ptr::null::<::core::ffi::c_double>(),
+        ::core::ptr::null::<::core::ffi::c_double>(),
     ) < (*s).xtol_rel
         * vector_norm(
             (*s).n,
             x,
             (*s).x_weights,
-            0 as *const ::core::ffi::c_double,
-            0 as *const ::core::ffi::c_double,
+            ::core::ptr::null::<::core::ffi::c_double>(),
+            ::core::ptr::null::<::core::ffi::c_double>(),
         )
     {
         return 1 as ::core::ffi::c_int;
     }
-    if ((*s).xtol_abs).is_null() {
+    if (*s).xtol_abs.is_null() {
         return 0 as ::core::ffi::c_int;
     }
-    i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+    i = 0 as ::core::ffi::c_uint;
     while i < (*s).n {
         if (*x.offset(i as isize) - *oldx.offset(i as isize)).abs()
             >= *((*s).xtol_abs).offset(i as isize)
@@ -440,35 +439,35 @@ unsafe fn nlopt_stop_x(
         i = i.wrapping_add(1);
     }
     return 1 as ::core::ffi::c_int;
-}}
+}
 
 unsafe fn nlopt_stop_dx(
     mut s: *const nlopt_stopping,
     mut x: *const ::core::ffi::c_double,
     mut dx: *const ::core::ffi::c_double,
-) -> ::core::ffi::c_int { unsafe {
+) -> ::core::ffi::c_int {
     let mut i: ::core::ffi::c_uint = 0;
     if vector_norm(
         (*s).n,
         dx,
         (*s).x_weights,
-        0 as *const ::core::ffi::c_double,
-        0 as *const ::core::ffi::c_double,
+        ::core::ptr::null::<::core::ffi::c_double>(),
+        ::core::ptr::null::<::core::ffi::c_double>(),
     ) < (*s).xtol_rel
         * vector_norm(
             (*s).n,
             x,
             (*s).x_weights,
-            0 as *const ::core::ffi::c_double,
-            0 as *const ::core::ffi::c_double,
+            ::core::ptr::null::<::core::ffi::c_double>(),
+            ::core::ptr::null::<::core::ffi::c_double>(),
         )
     {
         return 1 as ::core::ffi::c_int;
     }
-    if ((*s).xtol_abs).is_null() {
+    if (*s).xtol_abs.is_null() {
         return 0 as ::core::ffi::c_int;
     }
-    i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+    i = 0 as ::core::ffi::c_uint;
     while i < (*s).n {
         if (*dx.offset(i as isize)).abs() >= *((*s).xtol_abs).offset(i as isize) {
             return 0 as ::core::ffi::c_int;
@@ -476,7 +475,7 @@ unsafe fn nlopt_stop_dx(
         i = i.wrapping_add(1);
     }
     return 1 as ::core::ffi::c_int;
-}}
+}
 
 unsafe fn nlopt_stop_xs(
     mut s: *const nlopt_stopping,
@@ -484,17 +483,17 @@ unsafe fn nlopt_stop_xs(
     mut oldxs: *const ::core::ffi::c_double,
     mut scale_min: *const ::core::ffi::c_double,
     mut scale_max: *const ::core::ffi::c_double,
-) -> ::core::ffi::c_int { unsafe {
+) -> ::core::ffi::c_int {
     let mut i: ::core::ffi::c_uint = 0;
     if diff_norm((*s).n, xs, oldxs, (*s).x_weights, scale_min, scale_max)
         < (*s).xtol_rel * vector_norm((*s).n, xs, (*s).x_weights, scale_min, scale_max)
     {
         return 1 as ::core::ffi::c_int;
     }
-    if ((*s).xtol_abs).is_null() {
+    if (*s).xtol_abs.is_null() {
         return 0 as ::core::ffi::c_int;
     }
-    i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+    i = 0 as ::core::ffi::c_uint;
     while i < (*s).n {
         if (sc(
             *xs.offset(i as isize),
@@ -513,7 +512,7 @@ unsafe fn nlopt_stop_xs(
         i = i.wrapping_add(1);
     }
     return 1 as ::core::ffi::c_int;
-}}
+}
 
 unsafe fn nlopt_isfinite(mut x: ::core::ffi::c_double) -> ::core::ffi::c_int {
     return ((x).abs() <= 1.7976931348623157e+308f64) as ::core::ffi::c_int;
@@ -531,26 +530,26 @@ unsafe fn nlopt_isnan(mut x: ::core::ffi::c_double) -> ::core::ffi::c_int {
     return x.is_nan() as i32;
 }
 
-unsafe fn nlopt_stop_evals(mut s: *const nlopt_stopping) -> ::core::ffi::c_int { unsafe {
+unsafe fn nlopt_stop_evals(mut s: *const nlopt_stopping) -> ::core::ffi::c_int {
     return ((*s).maxeval > 0 as ::core::ffi::c_int && *(*s).nevals_p >= (*s).maxeval) as ::core::ffi::c_int;
-}}
+}
 
-unsafe fn nlopt_stop_time_(mut start: ::core::ffi::c_double, mut maxtime: ::core::ffi::c_double) -> ::core::ffi::c_int { unsafe {
+unsafe fn nlopt_stop_time_(mut start: ::core::ffi::c_double, mut maxtime: ::core::ffi::c_double) -> ::core::ffi::c_int {
     return (maxtime > 0 as ::core::ffi::c_int as ::core::ffi::c_double && nlopt_seconds() - start >= maxtime)
         as ::core::ffi::c_int;
-}}
+}
 
-unsafe fn nlopt_stop_time(mut s: *const nlopt_stopping) -> ::core::ffi::c_int { unsafe {
+unsafe fn nlopt_stop_time(mut s: *const nlopt_stopping) -> ::core::ffi::c_int {
     return nlopt_stop_time_((*s).start, (*s).maxtime);
-}}
+}
 
-unsafe fn nlopt_stop_evalstime(mut stop: *const nlopt_stopping) -> ::core::ffi::c_int { unsafe {
+unsafe fn nlopt_stop_evalstime(mut stop: *const nlopt_stopping) -> ::core::ffi::c_int {
     return (nlopt_stop_evals(stop) != 0 || nlopt_stop_time(stop) != 0) as ::core::ffi::c_int;
-}}
+}
 
-unsafe fn nlopt_stop_forced(mut stop: *const nlopt_stopping) -> ::core::ffi::c_int { unsafe {
+unsafe fn nlopt_stop_forced(mut stop: *const nlopt_stopping) -> ::core::ffi::c_int {
     return (!((*stop).force_stop).is_null() && *(*stop).force_stop != 0) as ::core::ffi::c_int;
-}}
+}
 //
 // pub unsafe fn nlopt_vsprintf(
 //     mut p: *mut ::core::ffi::c_char,
@@ -582,31 +581,31 @@ unsafe fn nlopt_stop_forced(mut stop: *const nlopt_stopping) -> ::core::ffi::c_i
 //     return p;
 // }
 
-unsafe fn nlopt_stop_msg(mut s: *mut nlopt_stopping, msg: &str) { unsafe {
+unsafe fn nlopt_stop_msg(mut s: *mut nlopt_stopping, msg: &str) {
     (*s).stop_msg = msg.to_string();
-}}
+}
 
 unsafe fn nlopt_count_constraints(
     mut p: ::core::ffi::c_uint,
     mut c: *const nlopt_constraint,
-) -> ::core::ffi::c_uint { unsafe {
+) -> ::core::ffi::c_uint {
     let mut i: ::core::ffi::c_uint = 0;
-    let mut count: ::core::ffi::c_uint = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
-    i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+    let mut count: ::core::ffi::c_uint = 0 as ::core::ffi::c_uint;
+    i = 0 as ::core::ffi::c_uint;
     while i < p {
         count = count.wrapping_add((*c.offset(i as isize)).m);
         i = i.wrapping_add(1);
     }
     return count;
-}}
+}
 
 unsafe fn nlopt_max_constraint_dim(
     mut p: ::core::ffi::c_uint,
     mut c: *const nlopt_constraint,
-) -> ::core::ffi::c_uint { unsafe {
+) -> ::core::ffi::c_uint {
     let mut i: ::core::ffi::c_uint = 0;
-    let mut max_dim: ::core::ffi::c_uint = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
-    i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+    let mut max_dim: ::core::ffi::c_uint = 0 as ::core::ffi::c_uint;
+    i = 0 as ::core::ffi::c_uint;
     while i < p {
         if (*c.offset(i as isize)).m > max_dim {
             max_dim = (*c.offset(i as isize)).m;
@@ -614,7 +613,7 @@ unsafe fn nlopt_max_constraint_dim(
         i = i.wrapping_add(1);
     }
     return max_dim;
-}}
+}
 
 unsafe fn nlopt_eval_constraint<U>(
     mut result: *mut ::core::ffi::c_double,
@@ -622,8 +621,8 @@ unsafe fn nlopt_eval_constraint<U>(
     mut c: *const nlopt_constraint,
     mut n: ::core::ffi::c_uint,
     mut x: *const ::core::ffi::c_double,
-) { unsafe {
-    if ((*c).f).is_some() {
+) {
+    if (*c).f.is_some() {
         *result.offset(0 as ::core::ffi::c_int as isize) =
         // PATCH Weird bug ((*c).f).expect("non-null function pointer") calls the objective function!!!
         // even if (*c), nlopt_constraint object was correctly built with a nlopt_constraint_raw_callback!!! 
@@ -631,9 +630,9 @@ unsafe fn nlopt_eval_constraint<U>(
         // Maybe the U generic parameter required explains it cannot work like with C ???
         nlopt_constraint_raw_callback::<&dyn Func<U>, U>(n, x, grad, (*c).f_data);
     } else {
-        ((*c).mf).expect("non-null function pointer")((*c).m, result, n, x, grad, (*c).f_data);
+        (*c).mf.expect("non-null function pointer")((*c).m, result, n, x, grad, (*c).f_data);
     };
-}}
+}
 
 unsafe fn nlopt_isinf(mut x: ::core::ffi::c_double) -> ::core::ffi::c_int {
     return ((x).abs() >= f64::INFINITY * 0.99f64
@@ -651,7 +650,7 @@ unsafe fn nlopt_isinf(mut x: ::core::ffi::c_double) -> ::core::ffi::c_int {
 unsafe fn nlopt_compute_rescaling(
     mut n: ::core::ffi::c_uint,
     mut dx: *const ::core::ffi::c_double,
-) -> *mut ::core::ffi::c_double { unsafe {
+) -> *mut ::core::ffi::c_double {
     // let mut s: *mut ::core::ffi::c_double = malloc(
     //     (::std::mem::size_of::<::core::ffi::c_double>() as ::core::ffi::c_ulong).wrapping_mul(n as ::core::ffi::c_ulong),
     // ) as *mut ::core::ffi::c_double;
@@ -662,82 +661,82 @@ unsafe fn nlopt_compute_rescaling(
 
     let mut i: ::core::ffi::c_uint = 0;
     if s.is_null() {
-        return 0 as *mut ::core::ffi::c_double;
+        return ::core::ptr::null_mut::<::core::ffi::c_double>();
     }
-    i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+    i = 0 as ::core::ffi::c_uint;
     while i < n {
         *s.offset(i as isize) = 1.0f64;
         i = i.wrapping_add(1);
     }
-    if n == 1 as ::core::ffi::c_int as ::core::ffi::c_uint {
+    if n == 1 as ::core::ffi::c_uint {
         return s;
     }
-    i = 1 as ::core::ffi::c_int as ::core::ffi::c_uint;
+    i = 1 as ::core::ffi::c_uint;
     while i < n
-        && *dx.offset(i as isize)
-            == *dx.offset(i.wrapping_sub(1 as ::core::ffi::c_int as ::core::ffi::c_uint) as isize)
+        && *dx.offset(i as isize) == *dx.offset(i.wrapping_sub(1 as ::core::ffi::c_uint) as isize)
     {
         i = i.wrapping_add(1);
     }
     if i < n {
-        i = 1 as ::core::ffi::c_int as ::core::ffi::c_uint;
+        i = 1 as ::core::ffi::c_uint;
         while i < n {
-            *s.offset(i as isize) = *dx.offset(i as isize) / *dx.offset(0 as ::core::ffi::c_int as isize);
+            *s.offset(i as isize) =
+                *dx.offset(i as isize) / *dx.offset(0 as ::core::ffi::c_int as isize);
             i = i.wrapping_add(1);
         }
     }
     return s;
-}}
+}
 
 unsafe fn nlopt_rescale(
     mut n: ::core::ffi::c_uint,
     mut s: *const ::core::ffi::c_double,
     mut x: *const ::core::ffi::c_double,
     mut xs: *mut ::core::ffi::c_double,
-) { unsafe {
+) {
     let mut i: ::core::ffi::c_uint = 0;
     if s.is_null() {
-        i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+        i = 0 as ::core::ffi::c_uint;
         while i < n {
             *xs.offset(i as isize) = *x.offset(i as isize);
             i = i.wrapping_add(1);
         }
     } else {
-        i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+        i = 0 as ::core::ffi::c_uint;
         while i < n {
             *xs.offset(i as isize) = *x.offset(i as isize) / *s.offset(i as isize);
             i = i.wrapping_add(1);
         }
     };
-}}
+}
 
 unsafe fn nlopt_unscale(
     mut n: ::core::ffi::c_uint,
     mut s: *const ::core::ffi::c_double,
     mut x: *const ::core::ffi::c_double,
     mut xs: *mut ::core::ffi::c_double,
-) { unsafe {
+) {
     let mut i: ::core::ffi::c_uint = 0;
     if s.is_null() {
-        i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+        i = 0 as ::core::ffi::c_uint;
         while i < n {
             *xs.offset(i as isize) = *x.offset(i as isize);
             i = i.wrapping_add(1);
         }
     } else {
-        i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+        i = 0 as ::core::ffi::c_uint;
         while i < n {
             *xs.offset(i as isize) = *x.offset(i as isize) * *s.offset(i as isize);
             i = i.wrapping_add(1);
         }
     };
-}}
+}
 
 unsafe fn nlopt_new_rescaled(
     mut n: ::core::ffi::c_uint,
     mut s: *const ::core::ffi::c_double,
     mut x: *const ::core::ffi::c_double,
-) -> *mut ::core::ffi::c_double { unsafe {
+) -> *mut ::core::ffi::c_double {
     // let mut xs: *mut ::core::ffi::c_double = malloc(
     //     (::std::mem::size_of::<::core::ffi::c_double>() as ::core::ffi::c_ulong).wrapping_mul(n as ::core::ffi::c_ulong),
     // ) as *mut ::core::ffi::c_double;
@@ -747,19 +746,19 @@ unsafe fn nlopt_new_rescaled(
     std::mem::forget(space);
 
     if xs.is_null() {
-        return 0 as *mut ::core::ffi::c_double;
+        return ::core::ptr::null_mut::<::core::ffi::c_double>();
     }
     nlopt_rescale(n, s, x, xs);
     return xs;
-}}
+}
 
 unsafe fn nlopt_reorder_bounds(
     mut n: ::core::ffi::c_uint,
     mut lb: *mut ::core::ffi::c_double,
     mut ub: *mut ::core::ffi::c_double,
-) { unsafe {
+) {
     let mut i: ::core::ffi::c_uint = 0;
-    i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+    i = 0 as ::core::ffi::c_uint;
     while i < n {
         if *lb.offset(i as isize) > *ub.offset(i as isize) {
             let mut t: ::core::ffi::c_double = *lb.offset(i as isize);
@@ -768,14 +767,14 @@ unsafe fn nlopt_reorder_bounds(
         }
         i = i.wrapping_add(1);
     }
-}}
+}
 unsafe fn dcopy___(
     mut n_: *mut ::core::ffi::c_int,
     mut dx: *const ::core::ffi::c_double,
     mut incx: ::core::ffi::c_int,
     mut dy: *mut ::core::ffi::c_double,
     mut incy: ::core::ffi::c_int,
-) { unsafe {
+) {
     let mut i: ::core::ffi::c_int = 0;
     let mut n: ::core::ffi::c_int = *n_;
     if n <= 0 as ::core::ffi::c_int {
@@ -785,8 +784,8 @@ unsafe fn dcopy___(
         memcpy(
             dy as *mut ::core::ffi::c_void,
             dx as *const ::core::ffi::c_void,
-            (::std::mem::size_of::<::core::ffi::c_double>() as ::core::ffi::c_ulong)
-                .wrapping_mul(n as ::core::ffi::c_uint as ::core::ffi::c_ulong),
+            (::core::mem::size_of::<::core::ffi::c_double>() as size_t)
+                .wrapping_mul(n as ::core::ffi::c_uint as size_t),
         );
     } else if incx == 0 as ::core::ffi::c_int && incy == 1 as ::core::ffi::c_int {
         let mut x: ::core::ffi::c_double = *dx.offset(0 as ::core::ffi::c_int as isize);
@@ -802,7 +801,7 @@ unsafe fn dcopy___(
             i += 1;
         }
     };
-}}
+}
 unsafe fn daxpy_sl__(
     mut n_: *mut ::core::ffi::c_int,
     mut da_: *const ::core::ffi::c_double,
@@ -810,7 +809,7 @@ unsafe fn daxpy_sl__(
     mut incx: ::core::ffi::c_int,
     mut dy: *mut ::core::ffi::c_double,
     mut incy: ::core::ffi::c_int,
-) { unsafe {
+) {
     let mut n: ::core::ffi::c_int = *n_;
     let mut i: ::core::ffi::c_int = 0;
     let mut da: ::core::ffi::c_double = *da_;
@@ -822,14 +821,14 @@ unsafe fn daxpy_sl__(
         *dy.offset((i * incy) as isize) += da * *dx.offset((i * incx) as isize);
         i += 1;
     }
-}}
+}
 unsafe fn ddot_sl__(
     mut n_: *mut ::core::ffi::c_int,
     mut dx: *mut ::core::ffi::c_double,
     mut incx: ::core::ffi::c_int,
     mut dy: *mut ::core::ffi::c_double,
     mut incy: ::core::ffi::c_int,
-) -> ::core::ffi::c_double { unsafe {
+) -> ::core::ffi::c_double {
     let mut n: ::core::ffi::c_int = *n_;
     let mut i: ::core::ffi::c_int = 0;
     let mut sum: ::core::ffi::c_double = 0 as ::core::ffi::c_int as ::core::ffi::c_double;
@@ -842,12 +841,12 @@ unsafe fn ddot_sl__(
         i += 1;
     }
     return sum;
-}}
+}
 unsafe fn dnrm2___(
     mut n_: *mut ::core::ffi::c_int,
     mut dx: *mut ::core::ffi::c_double,
     mut incx: ::core::ffi::c_int,
-) -> ::core::ffi::c_double { unsafe {
+) -> ::core::ffi::c_double {
     let mut i: ::core::ffi::c_int = 0;
     let mut n: ::core::ffi::c_int = *n_;
     let mut xmax: ::core::ffi::c_double = 0 as ::core::ffi::c_int as ::core::ffi::c_double;
@@ -872,7 +871,7 @@ unsafe fn dnrm2___(
         i += 1;
     }
     return xmax * sum.sqrt();
-}}
+}
 unsafe fn dsrot_(
     mut n: ::core::ffi::c_int,
     mut dx: *mut ::core::ffi::c_double,
@@ -881,7 +880,7 @@ unsafe fn dsrot_(
     mut incy: ::core::ffi::c_int,
     mut c__: *mut ::core::ffi::c_double,
     mut s_: *mut ::core::ffi::c_double,
-) { unsafe {
+) {
     let mut i: ::core::ffi::c_int = 0;
     let mut c: ::core::ffi::c_double = *c__;
     let mut s: ::core::ffi::c_double = *s_;
@@ -893,13 +892,13 @@ unsafe fn dsrot_(
         *dy.offset((incy * i) as isize) = c * y - s * x;
         i += 1;
     }
-}}
+}
 unsafe fn dsrotg_(
     mut da: *mut ::core::ffi::c_double,
     mut db: *mut ::core::ffi::c_double,
     mut c: *mut ::core::ffi::c_double,
     mut s: *mut ::core::ffi::c_double,
-) { unsafe {
+) {
     let mut absa: ::core::ffi::c_double = 0.;
     let mut absb: ::core::ffi::c_double = 0.;
     let mut roe: ::core::ffi::c_double = 0.;
@@ -937,13 +936,13 @@ unsafe fn dsrotg_(
         *da = *db;
         *s = *da;
     };
-}}
+}
 unsafe fn dscal_sl__(
     mut n_: *mut ::core::ffi::c_int,
     mut da: *const ::core::ffi::c_double,
     mut dx: *mut ::core::ffi::c_double,
     mut incx: ::core::ffi::c_int,
-) { unsafe {
+) {
     let mut i: ::core::ffi::c_int = 0;
     let mut n: ::core::ffi::c_int = *n_;
     let mut alpha: ::core::ffi::c_double = *da;
@@ -952,7 +951,7 @@ unsafe fn dscal_sl__(
         *dx.offset((i * incx) as isize) *= alpha;
         i += 1;
     }
-}}
+}
 static mut c__0: ::core::ffi::c_int = 0 as ::core::ffi::c_int;
 static mut c__1: ::core::ffi::c_int = 1 as ::core::ffi::c_int;
 static mut c__2: ::core::ffi::c_int = 2 as ::core::ffi::c_int;
@@ -968,7 +967,7 @@ unsafe fn h12_(
     mut ice: *const ::core::ffi::c_int,
     mut icv: *const ::core::ffi::c_int,
     mut ncv: *const ::core::ffi::c_int,
-) { unsafe {
+) {
     let mut current_block: u64;
     let one: ::core::ffi::c_double = 1.0f64;
     let mut u_dim1: ::core::ffi::c_int = 0;
@@ -995,9 +994,9 @@ unsafe fn h12_(
         cl = (d__1).abs();
         if *mode == 2 as ::core::ffi::c_int {
             if cl <= 0.0f64 {
-                current_block = 12017783607140213051;
+                current_block = 17095853620682146675;
             } else {
-                current_block = 16897903984108266201;
+                current_block = 17641539699934407521;
             }
         } else {
             i__1 = *m;
@@ -1009,7 +1008,7 @@ unsafe fn h12_(
                 j += 1;
             }
             if cl <= 0.0f64 {
-                current_block = 12017783607140213051;
+                current_block = 17095853620682146675;
             } else {
                 clinv = one / cl;
                 d__1 = *u.offset((*lpivot * u_dim1 + 1 as ::core::ffi::c_int) as isize) * clinv;
@@ -1027,11 +1026,11 @@ unsafe fn h12_(
                 }
                 *up = *u.offset((*lpivot * u_dim1 + 1 as ::core::ffi::c_int) as isize) - cl;
                 *u.offset((*lpivot * u_dim1 + 1 as ::core::ffi::c_int) as isize) = cl;
-                current_block = 16897903984108266201;
+                current_block = 17641539699934407521;
             }
         }
         match current_block {
-            12017783607140213051 => {}
+            17095853620682146675 => {}
             _ => {
                 if !(*ncv <= 0 as ::core::ffi::c_int) {
                     b = *up * *u.offset((*lpivot * u_dim1 + 1 as ::core::ffi::c_int) as isize);
@@ -1073,7 +1072,7 @@ unsafe fn h12_(
             }
         }
     }
-}}
+}
 unsafe fn nnls_(
     mut a: *mut ::core::ffi::c_double,
     mut mda: *mut ::core::ffi::c_int,
@@ -1086,7 +1085,7 @@ unsafe fn nnls_(
     mut z__: *mut ::core::ffi::c_double,
     mut indx: *mut ::core::ffi::c_int,
     mut mode: *mut ::core::ffi::c_int,
-) { unsafe {
+) {
     let mut current_block: u64;
     let one: ::core::ffi::c_double = 1.0f64;
     let factor: ::core::ffi::c_double = 0.01f64;
@@ -1145,14 +1144,14 @@ unsafe fn nnls_(
         *x.offset(1 as ::core::ffi::c_int as isize) = 0.0f64;
         dcopy___(
             n,
-            &*x.offset(1 as ::core::ffi::c_int as isize),
+            x.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
             0 as ::core::ffi::c_int,
-            &mut *x.offset(1 as ::core::ffi::c_int as isize),
+            x.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
         );
-        'c_11282: loop {
+        '_L110: loop {
             if iz1 > iz2 || nsetp >= *m {
-                current_block = 1795062611287366171;
+                current_block = 1598957747739433155;
                 break;
             }
             i__1 = iz2;
@@ -1161,10 +1160,10 @@ unsafe fn nnls_(
                 j = *indx.offset(iz as isize);
                 i__2 = *m - nsetp;
                 *w.offset(j as isize) = ddot_sl__(
-                    &mut i__2,
-                    &mut *a.offset((npp1 + j * a_dim1) as isize),
+                    &raw mut i__2,
+                    a.offset((npp1 + j * a_dim1) as isize) as *mut ::core::ffi::c_double,
                     1 as ::core::ffi::c_int,
-                    &mut *b.offset(npp1 as isize),
+                    b.offset(npp1 as isize) as *mut ::core::ffi::c_double,
                     1 as ::core::ffi::c_int,
                 );
                 iz += 1;
@@ -1182,29 +1181,31 @@ unsafe fn nnls_(
                     iz += 1;
                 }
                 if wmax <= 0.0f64 {
-                    current_block = 1795062611287366171;
-                    break 'c_11282;
+                    current_block = 1598957747739433155;
+                    break '_L110;
                 }
                 iz = izmax;
                 j = *indx.offset(iz as isize);
                 asave = *a.offset((npp1 + j * a_dim1) as isize);
                 i__2 = npp1 + 1 as ::core::ffi::c_int;
                 h12_(
-                    &c__1,
-                    &mut npp1,
-                    &mut i__2,
+                    &raw const c__1,
+                    &raw mut npp1,
+                    &raw mut i__2,
                     m,
-                    &mut *a.offset((j * a_dim1 + 1 as ::core::ffi::c_int) as isize),
-                    &c__1,
-                    &mut up,
-                    &mut *z__.offset(1 as ::core::ffi::c_int as isize),
-                    &c__1,
-                    &c__1,
-                    &c__0,
+                    a.offset((j * a_dim1 + 1 as ::core::ffi::c_int) as isize)
+                        as *mut ::core::ffi::c_double,
+                    &raw const c__1,
+                    &raw mut up,
+                    z__.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                    &raw const c__1,
+                    &raw const c__1,
+                    &raw const c__0,
                 );
                 unorm = dnrm2___(
-                    &mut nsetp,
-                    &mut *a.offset((j * a_dim1 + 1 as ::core::ffi::c_int) as isize),
+                    &raw mut nsetp,
+                    a.offset((j * a_dim1 + 1 as ::core::ffi::c_int) as isize)
+                        as *mut ::core::ffi::c_double,
                     1 as ::core::ffi::c_int,
                 );
                 d__1 = *a.offset((npp1 + j * a_dim1) as isize);
@@ -1213,24 +1214,25 @@ unsafe fn nnls_(
                 if !(d__1 - unorm <= 0.0f64) {
                     dcopy___(
                         m,
-                        &*b.offset(1 as ::core::ffi::c_int as isize),
+                        b.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                         1 as ::core::ffi::c_int,
-                        &mut *z__.offset(1 as ::core::ffi::c_int as isize),
+                        z__.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                         1 as ::core::ffi::c_int,
                     );
                     i__2 = npp1 + 1 as ::core::ffi::c_int;
                     h12_(
-                        &c__2,
-                        &mut npp1,
-                        &mut i__2,
+                        &raw const c__2,
+                        &raw mut npp1,
+                        &raw mut i__2,
                         m,
-                        &mut *a.offset((j * a_dim1 + 1 as ::core::ffi::c_int) as isize),
-                        &c__1,
-                        &mut up,
-                        &mut *z__.offset(1 as ::core::ffi::c_int as isize),
-                        &c__1,
-                        &c__1,
-                        &c__1,
+                        a.offset((j * a_dim1 + 1 as ::core::ffi::c_int) as isize)
+                            as *mut ::core::ffi::c_double,
+                        &raw const c__1,
+                        &raw mut up,
+                        z__.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                        &raw const c__1,
+                        &raw const c__1,
+                        &raw const c__1,
                     );
                     if *z__.offset(npp1 as isize) / *a.offset((npp1 + j * a_dim1) as isize) > 0.0f64
                     {
@@ -1242,9 +1244,9 @@ unsafe fn nnls_(
             }
             dcopy___(
                 m,
-                z__.offset(1 as ::core::ffi::c_int as isize),
+                z__.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                 1 as ::core::ffi::c_int,
-                &mut *b.offset(1 as ::core::ffi::c_int as isize),
+                b.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                 1 as ::core::ffi::c_int,
             );
             *indx.offset(iz as isize) = *indx.offset(iz1 as isize);
@@ -1257,17 +1259,19 @@ unsafe fn nnls_(
             while jz <= i__2 {
                 jj = *indx.offset(jz as isize);
                 h12_(
-                    &c__2,
-                    &mut nsetp,
-                    &mut npp1,
+                    &raw const c__2,
+                    &raw mut nsetp,
+                    &raw mut npp1,
                     m,
-                    &mut *a.offset((j * a_dim1 + 1 as ::core::ffi::c_int) as isize),
-                    &c__1,
-                    &mut up,
-                    &mut *a.offset((jj * a_dim1 + 1 as ::core::ffi::c_int) as isize),
-                    &c__1,
+                    a.offset((j * a_dim1 + 1 as ::core::ffi::c_int) as isize)
+                        as *mut ::core::ffi::c_double,
+                    &raw const c__1,
+                    &raw mut up,
+                    a.offset((jj * a_dim1 + 1 as ::core::ffi::c_int) as isize)
+                        as *mut ::core::ffi::c_double,
+                    &raw const c__1,
                     mda,
-                    &c__1,
+                    &raw const c__1,
                 );
                 jz += 1;
             }
@@ -1275,10 +1279,10 @@ unsafe fn nnls_(
             *w.offset(j as isize) = 0.0f64;
             i__2 = *m - nsetp;
             dcopy___(
-                &mut i__2,
-                w.offset(j as isize),
+                &raw mut i__2,
+                w.offset(j as isize) as *mut ::core::ffi::c_double,
                 0 as ::core::ffi::c_int,
-                &mut *a.offset((k + j * a_dim1) as isize),
+                a.offset((k + j * a_dim1) as isize) as *mut ::core::ffi::c_double,
                 1 as ::core::ffi::c_int,
             );
             loop {
@@ -1287,11 +1291,13 @@ unsafe fn nnls_(
                     if !(ip == nsetp) {
                         d__1 = -*z__.offset((ip + 1 as ::core::ffi::c_int) as isize);
                         daxpy_sl__(
-                            &mut ip,
-                            &d__1,
-                            a.offset((jj * a_dim1 + 1 as ::core::ffi::c_int) as isize),
+                            &raw mut ip,
+                            &raw mut d__1,
+                            a.offset((jj * a_dim1 + 1 as ::core::ffi::c_int) as isize)
+                                as *mut ::core::ffi::c_double,
                             1 as ::core::ffi::c_int,
-                            &mut *z__.offset(1 as ::core::ffi::c_int as isize),
+                            z__.offset(1 as ::core::ffi::c_int as isize)
+                                as *mut ::core::ffi::c_double,
                             1 as ::core::ffi::c_int,
                         );
                     }
@@ -1301,8 +1307,8 @@ unsafe fn nnls_(
                 }
                 iter += 1;
                 if !(iter <= itmax) {
-                    current_block = 7781325733407116356;
-                    break 'c_11282;
+                    current_block = 15774334763445529798;
+                    break '_L110;
                 }
                 alpha = one;
                 jj = 0 as ::core::ffi::c_int;
@@ -1332,7 +1338,7 @@ unsafe fn nnls_(
                     break;
                 }
                 i__ = *indx.offset(jj as isize);
-                'c_11330: loop {
+                '_L250: loop {
                     *x.offset(i__ as isize) = 0.0f64;
                     jj += 1;
                     i__2 = nsetp;
@@ -1349,23 +1355,25 @@ unsafe fn nnls_(
                         t = *a.offset((j - 1 as ::core::ffi::c_int + ii * a_dim1) as isize);
                         dsrot_(
                             *n,
-                            &mut *a.offset((j - 1 as ::core::ffi::c_int + a_dim1) as isize),
+                            a.offset((j - 1 as ::core::ffi::c_int + a_dim1) as isize)
+                                as *mut ::core::ffi::c_double,
                             *mda,
-                            &mut *a.offset((j + a_dim1) as isize),
+                            a.offset((j + a_dim1) as isize) as *mut ::core::ffi::c_double,
                             *mda,
-                            &mut c__,
-                            &mut s,
+                            &raw mut c__,
+                            &raw mut s,
                         );
                         *a.offset((j - 1 as ::core::ffi::c_int + ii * a_dim1) as isize) = t;
                         *a.offset((j + ii * a_dim1) as isize) = 0.0f64;
                         dsrot_(
                             1 as ::core::ffi::c_int,
-                            &mut *b.offset((j - 1 as ::core::ffi::c_int) as isize),
+                            b.offset((j - 1 as ::core::ffi::c_int) as isize)
+                                as *mut ::core::ffi::c_double,
                             1 as ::core::ffi::c_int,
-                            &mut *b.offset(j as isize),
+                            b.offset(j as isize) as *mut ::core::ffi::c_double,
                             1 as ::core::ffi::c_int,
-                            &mut c__,
-                            &mut s,
+                            &raw mut c__,
+                            &raw mut s,
                         );
                         j += 1;
                     }
@@ -1374,14 +1382,14 @@ unsafe fn nnls_(
                     iz1 -= 1;
                     *indx.offset(iz1 as isize) = i__;
                     if nsetp <= 0 as ::core::ffi::c_int {
-                        current_block = 7781325733407116356;
-                        break 'c_11282;
+                        current_block = 15774334763445529798;
+                        break '_L110;
                     }
                     i__2 = nsetp;
                     jj = 1 as ::core::ffi::c_int;
                     loop {
                         if !(jj <= i__2) {
-                            break 'c_11330;
+                            break '_L250;
                         }
                         i__ = *indx.offset(jj as isize);
                         if *x.offset(i__ as isize) <= 0.0f64 {
@@ -1392,34 +1400,38 @@ unsafe fn nnls_(
                 }
                 dcopy___(
                     m,
-                    b.offset(1 as ::core::ffi::c_int as isize),
+                    b.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                     1 as ::core::ffi::c_int,
-                    &mut *z__.offset(1 as ::core::ffi::c_int as isize),
+                    z__.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                     1 as ::core::ffi::c_int,
                 );
             }
         }
         match current_block {
-            7781325733407116356 => {
+            15774334763445529798 => {
                 *mode = 3 as ::core::ffi::c_int;
             }
             _ => {}
         }
         k = if npp1 <= *m { npp1 } else { *m };
         i__2 = *m - nsetp;
-        *rnorm = dnrm2___(&mut i__2, &mut *b.offset(k as isize), 1 as ::core::ffi::c_int);
+        *rnorm = dnrm2___(
+            &raw mut i__2,
+            b.offset(k as isize) as *mut ::core::ffi::c_double,
+            1 as ::core::ffi::c_int,
+        );
         if npp1 > *m {
             *w.offset(1 as ::core::ffi::c_int as isize) = 0.0f64;
             dcopy___(
                 n,
-                w.offset(1 as ::core::ffi::c_int as isize),
+                w.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                 0 as ::core::ffi::c_int,
-                &mut *w.offset(1 as ::core::ffi::c_int as isize),
+                w.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                 1 as ::core::ffi::c_int,
             );
         }
     }
-}}
+}
 unsafe fn ldp_(
     mut g: *mut ::core::ffi::c_double,
     mut mg: *mut ::core::ffi::c_int,
@@ -1431,7 +1443,7 @@ unsafe fn ldp_(
     mut w: *mut ::core::ffi::c_double,
     mut indx: *mut ::core::ffi::c_int,
     mut mode: *mut ::core::ffi::c_int,
-) { unsafe {
+) {
     let one: ::core::ffi::c_double = 1.0f64;
     let mut g_dim1: ::core::ffi::c_int = 0;
     let mut g_offset: ::core::ffi::c_int = 0;
@@ -1461,9 +1473,9 @@ unsafe fn ldp_(
         *x.offset(1 as ::core::ffi::c_int as isize) = 0.0f64;
         dcopy___(
             n,
-            x.offset(1 as ::core::ffi::c_int as isize),
+            x.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
             0 as ::core::ffi::c_int,
-            &mut *x.offset(1 as ::core::ffi::c_int as isize),
+            x.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
         );
         *xnorm = 0.0f64;
@@ -1497,16 +1509,16 @@ unsafe fn ldp_(
             iy = iz + n1;
             iwdual = iy + *m;
             nnls_(
-                &mut *w.offset(1 as ::core::ffi::c_int as isize),
-                &mut n1,
-                &mut n1,
+                w.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                &raw mut n1,
+                &raw mut n1,
                 m,
-                &mut *w.offset(if__ as isize),
-                &mut *w.offset(iy as isize),
-                &mut rnorm,
-                &mut *w.offset(iwdual as isize),
-                &mut *w.offset(iz as isize),
-                &mut *indx.offset(1 as ::core::ffi::c_int as isize),
+                w.offset(if__ as isize) as *mut ::core::ffi::c_double,
+                w.offset(iy as isize) as *mut ::core::ffi::c_double,
+                &raw mut rnorm,
+                w.offset(iwdual as isize) as *mut ::core::ffi::c_double,
+                w.offset(iz as isize) as *mut ::core::ffi::c_double,
+                indx.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_int,
                 mode,
             );
             if !(*mode != 1 as ::core::ffi::c_int) {
@@ -1515,9 +1527,10 @@ unsafe fn ldp_(
                     fac = one
                         - ddot_sl__(
                             m,
-                            &mut *h__.offset(1 as ::core::ffi::c_int as isize),
+                            h__.offset(1 as ::core::ffi::c_int as isize)
+                                as *mut ::core::ffi::c_double,
                             1 as ::core::ffi::c_int,
-                            &mut *w.offset(iy as isize),
+                            w.offset(iy as isize) as *mut ::core::ffi::c_double,
                             1 as ::core::ffi::c_int,
                         );
                     d__1 = one + fac;
@@ -1530,32 +1543,37 @@ unsafe fn ldp_(
                             *x.offset(j as isize) = fac
                                 * ddot_sl__(
                                     m,
-                                    &mut *g.offset((j * g_dim1 + 1 as ::core::ffi::c_int) as isize),
+                                    g.offset((j * g_dim1 + 1 as ::core::ffi::c_int) as isize)
+                                        as *mut ::core::ffi::c_double,
                                     1 as ::core::ffi::c_int,
-                                    &mut *w.offset(iy as isize),
+                                    w.offset(iy as isize) as *mut ::core::ffi::c_double,
                                     1 as ::core::ffi::c_int,
                                 );
                             j += 1;
                         }
                         *xnorm = dnrm2___(
                             n,
-                            &mut *x.offset(1 as ::core::ffi::c_int as isize),
+                            x.offset(1 as ::core::ffi::c_int as isize)
+                                as *mut ::core::ffi::c_double,
                             1 as ::core::ffi::c_int,
                         );
                         *w.offset(1 as ::core::ffi::c_int as isize) = 0.0f64;
                         dcopy___(
                             m,
-                            w.offset(1 as ::core::ffi::c_int as isize),
+                            w.offset(1 as ::core::ffi::c_int as isize)
+                                as *mut ::core::ffi::c_double,
                             0 as ::core::ffi::c_int,
-                            &mut *w.offset(1 as ::core::ffi::c_int as isize),
+                            w.offset(1 as ::core::ffi::c_int as isize)
+                                as *mut ::core::ffi::c_double,
                             1 as ::core::ffi::c_int,
                         );
                         daxpy_sl__(
                             m,
-                            &fac,
-                            w.offset(iy as isize),
+                            &raw mut fac,
+                            w.offset(iy as isize) as *mut ::core::ffi::c_double,
                             1 as ::core::ffi::c_int,
-                            &mut *w.offset(1 as ::core::ffi::c_int as isize),
+                            w.offset(1 as ::core::ffi::c_int as isize)
+                                as *mut ::core::ffi::c_double,
                             1 as ::core::ffi::c_int,
                         );
                     }
@@ -1563,7 +1581,7 @@ unsafe fn ldp_(
             }
         }
     }
-}}
+}
 unsafe fn lsi_(
     mut e: *mut ::core::ffi::c_double,
     mut f: *mut ::core::ffi::c_double,
@@ -1579,7 +1597,7 @@ unsafe fn lsi_(
     mut w: *mut ::core::ffi::c_double,
     mut jw: *mut ::core::ffi::c_int,
     mut mode: *mut ::core::ffi::c_int,
-) { unsafe {
+) {
     let mut current_block: u64;
     let epmach: ::core::ffi::c_double = 2.22e-16f64;
     let one: ::core::ffi::c_double = 1.0f64;
@@ -1613,40 +1631,42 @@ unsafe fn lsi_(
         i__2 = i__ + 1 as ::core::ffi::c_int;
         i__3 = *n - i__;
         h12_(
-            &c__1,
-            &mut i__,
-            &mut i__2,
+            &raw const c__1,
+            &raw mut i__,
+            &raw mut i__2,
             me,
-            &mut *e.offset((i__ * e_dim1 + 1 as ::core::ffi::c_int) as isize),
-            &c__1,
-            &mut t,
-            &mut *e.offset((j * e_dim1 + 1 as ::core::ffi::c_int) as isize),
-            &c__1,
+            e.offset((i__ * e_dim1 + 1 as ::core::ffi::c_int) as isize)
+                as *mut ::core::ffi::c_double,
+            &raw const c__1,
+            &raw mut t,
+            e.offset((j * e_dim1 + 1 as ::core::ffi::c_int) as isize) as *mut ::core::ffi::c_double,
+            &raw const c__1,
             le,
-            &i__3,
+            &raw mut i__3,
         );
         i__2 = i__ + 1 as ::core::ffi::c_int;
         h12_(
-            &c__2,
-            &mut i__,
-            &mut i__2,
+            &raw const c__2,
+            &raw mut i__,
+            &raw mut i__2,
             me,
-            &mut *e.offset((i__ * e_dim1 + 1 as ::core::ffi::c_int) as isize),
-            &c__1,
-            &mut t,
-            &mut *f.offset(1 as ::core::ffi::c_int as isize),
-            &c__1,
-            &c__1,
-            &c__1,
+            e.offset((i__ * e_dim1 + 1 as ::core::ffi::c_int) as isize)
+                as *mut ::core::ffi::c_double,
+            &raw const c__1,
+            &raw mut t,
+            f.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+            &raw const c__1,
+            &raw const c__1,
+            &raw const c__1,
         );
         i__ += 1;
     }
     *mode = 5 as ::core::ffi::c_int;
     i__2 = *mg;
     i__ = 1 as ::core::ffi::c_int;
-    's_121: loop {
+    's_92: loop {
         if !(i__ <= i__2) {
-            current_block = 14434620278749266018;
+            current_block = 11057878835866523405;
             break;
         }
         i__1 = *n;
@@ -1654,16 +1674,17 @@ unsafe fn lsi_(
         while j <= i__1 {
             d__1 = *e.offset((j + j * e_dim1) as isize);
             if (d__1).abs() < epmach {
-                current_block = 1714560199797219869;
-                break 's_121;
+                current_block = 15870820249773205402;
+                break 's_92;
             }
             i__3 = j - 1 as ::core::ffi::c_int;
             *g.offset((i__ + j * g_dim1) as isize) = (*g.offset((i__ + j * g_dim1) as isize)
                 - ddot_sl__(
-                    &mut i__3,
-                    &mut *g.offset((i__ + g_dim1) as isize),
+                    &raw mut i__3,
+                    g.offset((i__ + g_dim1) as isize) as *mut ::core::ffi::c_double,
                     *lg,
-                    &mut *e.offset((j * e_dim1 + 1 as ::core::ffi::c_int) as isize),
+                    e.offset((j * e_dim1 + 1 as ::core::ffi::c_int) as isize)
+                        as *mut ::core::ffi::c_double,
                     1 as ::core::ffi::c_int,
                 ))
                 / *e.offset((j + j * e_dim1) as isize);
@@ -1671,34 +1692,34 @@ unsafe fn lsi_(
         }
         *h__.offset(i__ as isize) -= ddot_sl__(
             n,
-            &mut *g.offset((i__ + g_dim1) as isize),
+            g.offset((i__ + g_dim1) as isize) as *mut ::core::ffi::c_double,
             *lg,
-            &mut *f.offset(1 as ::core::ffi::c_int as isize),
+            f.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
         );
         i__ += 1;
     }
     match current_block {
-        14434620278749266018 => {
+        11057878835866523405 => {
             ldp_(
-                &mut *g.offset(g_offset as isize),
+                g.offset(g_offset as isize) as *mut ::core::ffi::c_double,
                 lg,
                 mg,
                 n,
-                &mut *h__.offset(1 as ::core::ffi::c_int as isize),
-                &mut *x.offset(1 as ::core::ffi::c_int as isize),
+                h__.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                x.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                 xnorm,
-                &mut *w.offset(1 as ::core::ffi::c_int as isize),
-                &mut *jw.offset(1 as ::core::ffi::c_int as isize),
+                w.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                jw.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_int,
                 mode,
             );
             if !(*mode != 1 as ::core::ffi::c_int) {
                 daxpy_sl__(
                     n,
-                    &one,
-                    f.offset(1 as ::core::ffi::c_int as isize),
+                    &raw const one,
+                    f.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                     1 as ::core::ffi::c_int,
-                    &mut *x.offset(1 as ::core::ffi::c_int as isize),
+                    x.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                     1 as ::core::ffi::c_int,
                 );
                 i__ = *n;
@@ -1708,10 +1729,10 @@ unsafe fn lsi_(
                     i__2 = *n - i__;
                     *x.offset(i__ as isize) = (*x.offset(i__ as isize)
                         - ddot_sl__(
-                            &mut i__2,
-                            &mut *e.offset((i__ + j * e_dim1) as isize),
+                            &raw mut i__2,
+                            e.offset((i__ + j * e_dim1) as isize) as *mut ::core::ffi::c_double,
                             *le,
-                            &mut *x.offset(j as isize),
+                            x.offset(j as isize) as *mut ::core::ffi::c_double,
                             1 as ::core::ffi::c_int,
                         ))
                         / *e.offset((i__ + i__ * e_dim1) as isize);
@@ -1720,13 +1741,17 @@ unsafe fn lsi_(
                 i__2 = *n + 1 as ::core::ffi::c_int;
                 j = if i__2 <= *me { i__2 } else { *me };
                 i__2 = *me - *n;
-                t = dnrm2___(&mut i__2, &mut *f.offset(j as isize), 1 as ::core::ffi::c_int);
+                t = dnrm2___(
+                    &raw mut i__2,
+                    f.offset(j as isize) as *mut ::core::ffi::c_double,
+                    1 as ::core::ffi::c_int,
+                );
                 *xnorm = (*xnorm * *xnorm + t * t).sqrt();
             }
         }
         _ => {}
     };
-}}
+}
 unsafe fn hfti_(
     mut a: *mut ::core::ffi::c_double,
     mut mda: *mut ::core::ffi::c_int,
@@ -1741,7 +1766,7 @@ unsafe fn hfti_(
     mut h__: *mut ::core::ffi::c_double,
     mut g: *mut ::core::ffi::c_double,
     mut ip: *mut ::core::ffi::c_int,
-) { unsafe {
+) {
     let mut current_block: u64;
     let factor: ::core::ffi::c_double = 0.001f64;
     let mut a_dim1: ::core::ffi::c_int = 0;
@@ -1780,7 +1805,7 @@ unsafe fn hfti_(
         while j <= i__1 {
             let mut current_block_56: u64;
             if j == 1 as ::core::ffi::c_int {
-                current_block_56 = 18323326546081147283;
+                current_block_56 = 14634468614531113631;
             } else {
                 lmax = j;
                 i__2 = *n;
@@ -1795,13 +1820,13 @@ unsafe fn hfti_(
                 }
                 d__1 = hmax + factor * *h__.offset(lmax as isize);
                 if d__1 - hmax > 0.0f64 {
-                    current_block_56 = 17342314209269636488;
+                    current_block_56 = 2432358212778639914;
                 } else {
-                    current_block_56 = 18323326546081147283;
+                    current_block_56 = 14634468614531113631;
                 }
             }
             match current_block_56 {
-                18323326546081147283 => {
+                14634468614531113631 => {
                     lmax = j;
                     i__2 = *n;
                     l = j;
@@ -1841,29 +1866,32 @@ unsafe fn hfti_(
             i__2 = j + 1 as ::core::ffi::c_int;
             i__3 = *n - j;
             h12_(
-                &c__1,
-                &mut j,
-                &mut i__2,
+                &raw const c__1,
+                &raw mut j,
+                &raw mut i__2,
                 m,
-                &mut *a.offset((j * a_dim1 + 1 as ::core::ffi::c_int) as isize),
-                &c__1,
-                &mut *h__.offset(j as isize),
-                &mut *a.offset((i__ * a_dim1 + 1 as ::core::ffi::c_int) as isize),
-                &c__1,
+                a.offset((j * a_dim1 + 1 as ::core::ffi::c_int) as isize)
+                    as *mut ::core::ffi::c_double,
+                &raw const c__1,
+                h__.offset(j as isize) as *mut ::core::ffi::c_double,
+                a.offset((i__ * a_dim1 + 1 as ::core::ffi::c_int) as isize)
+                    as *mut ::core::ffi::c_double,
+                &raw const c__1,
                 mda,
-                &i__3,
+                &raw mut i__3,
             );
             i__2 = j + 1 as ::core::ffi::c_int;
             h12_(
-                &c__2,
-                &mut j,
-                &mut i__2,
+                &raw const c__2,
+                &raw mut j,
+                &raw mut i__2,
                 m,
-                &mut *a.offset((j * a_dim1 + 1 as ::core::ffi::c_int) as isize),
-                &c__1,
-                &mut *h__.offset(j as isize),
-                &mut *b.offset(b_offset as isize),
-                &c__1,
+                a.offset((j * a_dim1 + 1 as ::core::ffi::c_int) as isize)
+                    as *mut ::core::ffi::c_double,
+                &raw const c__1,
+                h__.offset(j as isize) as *mut ::core::ffi::c_double,
+                b.offset(b_offset as isize) as *mut ::core::ffi::c_double,
+                &raw const c__1,
                 mdb,
                 nb,
             );
@@ -1873,18 +1901,18 @@ unsafe fn hfti_(
         j = 1 as ::core::ffi::c_int;
         loop {
             if !(j <= i__2) {
-                current_block = 18038362259723567392;
+                current_block = 8545136480011357681;
                 break;
             }
             d__1 = *a.offset((j + j * a_dim1) as isize);
             if (d__1).abs() <= *tau {
-                current_block = 11399179239179359665;
+                current_block = 1748094236375284402;
                 break;
             }
             j += 1;
         }
         match current_block {
-            18038362259723567392 => {
+            8545136480011357681 => {
                 k = ldiag;
             }
             _ => {
@@ -1897,8 +1925,8 @@ unsafe fn hfti_(
         while jb <= i__2 {
             i__1 = *m - k;
             *rnorm.offset(jb as isize) = dnrm2___(
-                &mut i__1,
-                &mut *b.offset((kp1 + jb * b_dim1) as isize),
+                &raw mut i__1,
+                b.offset((kp1 + jb * b_dim1) as isize) as *mut ::core::ffi::c_double,
                 1 as ::core::ffi::c_int,
             );
             jb += 1;
@@ -1909,17 +1937,17 @@ unsafe fn hfti_(
                 while i__ >= 1 as ::core::ffi::c_int {
                     i__2 = i__ - 1 as ::core::ffi::c_int;
                     h12_(
-                        &c__1,
-                        &mut i__,
-                        &mut kp1,
+                        &raw const c__1,
+                        &raw mut i__,
+                        &raw mut kp1,
                         n,
-                        &mut *a.offset((i__ + a_dim1) as isize),
+                        a.offset((i__ + a_dim1) as isize) as *mut ::core::ffi::c_double,
                         mda,
-                        &mut *g.offset(i__ as isize),
-                        &mut *a.offset(a_offset as isize),
+                        g.offset(i__ as isize) as *mut ::core::ffi::c_double,
+                        a.offset(a_offset as isize) as *mut ::core::ffi::c_double,
                         mda,
-                        &c__1,
-                        &i__2,
+                        &raw const c__1,
+                        &raw mut i__2,
                     );
                     i__ -= 1;
                 }
@@ -1935,10 +1963,10 @@ unsafe fn hfti_(
                     *b.offset((i__ + jb * b_dim1) as isize) = (*b
                         .offset((i__ + jb * b_dim1) as isize)
                         - ddot_sl__(
-                            &mut i__1,
-                            &mut *a.offset((i__ + j * a_dim1) as isize),
+                            &raw mut i__1,
+                            a.offset((i__ + j * a_dim1) as isize) as *mut ::core::ffi::c_double,
                             *mda,
-                            &mut *b.offset((j + jb * b_dim1) as isize),
+                            b.offset((j + jb * b_dim1) as isize) as *mut ::core::ffi::c_double,
                             1 as ::core::ffi::c_int,
                         ))
                         / *a.offset((i__ + i__ * a_dim1) as isize);
@@ -1955,17 +1983,18 @@ unsafe fn hfti_(
                     i__ = 1 as ::core::ffi::c_int;
                     while i__ <= i__1 {
                         h12_(
-                            &c__2,
-                            &mut i__,
-                            &mut kp1,
+                            &raw const c__2,
+                            &raw mut i__,
+                            &raw mut kp1,
                             n,
-                            &mut *a.offset((i__ + a_dim1) as isize),
+                            a.offset((i__ + a_dim1) as isize) as *mut ::core::ffi::c_double,
                             mda,
-                            &mut *g.offset(i__ as isize),
-                            &mut *b.offset((jb * b_dim1 + 1 as ::core::ffi::c_int) as isize),
-                            &c__1,
+                            g.offset(i__ as isize) as *mut ::core::ffi::c_double,
+                            b.offset((jb * b_dim1 + 1 as ::core::ffi::c_int) as isize)
+                                as *mut ::core::ffi::c_double,
+                            &raw const c__1,
                             mdb,
-                            &c__1,
+                            &raw const c__1,
                         );
                         i__ += 1;
                     }
@@ -1998,7 +2027,8 @@ unsafe fn hfti_(
         }
     }
     *krank = k;
-}}
+}
+
 unsafe fn lsei_(
     mut c__: *mut ::core::ffi::c_double,
     mut d__: *mut ::core::ffi::c_double,
@@ -2018,7 +2048,7 @@ unsafe fn lsei_(
     mut w: *mut ::core::ffi::c_double,
     mut jw: *mut ::core::ffi::c_int,
     mut mode: *mut ::core::ffi::c_int,
-) { unsafe {
+) {
     let mut current_block: u64;
     let epmach: ::core::ffi::c_double = 2.22e-16f64;
     let mut c_dim1: ::core::ffi::c_int = 0;
@@ -2061,7 +2091,9 @@ unsafe fn lsei_(
     if !(*mc > *n) {
         l = *n - *mc;
         mc1 = *mc + 1 as ::core::ffi::c_int;
-        iw = (l + 1 as ::core::ffi::c_int) * (*mg + 2 as ::core::ffi::c_int) + (*mg << 1 as ::core::ffi::c_int) + *mc;
+        iw = (l + 1 as ::core::ffi::c_int) * (*mg + 2 as ::core::ffi::c_int)
+            + (*mg << 1 as ::core::ffi::c_int)
+            + *mc;
         ie = iw + *mc + 1 as ::core::ffi::c_int;
         if__ = ie + *me * l;
         ig = if__ + *me;
@@ -2073,44 +2105,44 @@ unsafe fn lsei_(
             i__2 = i__ + 1 as ::core::ffi::c_int;
             i__3 = *mc - i__;
             h12_(
-                &c__1,
-                &mut i__,
-                &mut i__2,
+                &raw const c__1,
+                &raw mut i__,
+                &raw mut i__2,
                 n,
-                &mut *c__.offset((i__ + c_dim1) as isize),
+                c__.offset((i__ + c_dim1) as isize) as *mut ::core::ffi::c_double,
                 lc,
-                &mut *w.offset((iw + i__) as isize),
-                &mut *c__.offset((j + c_dim1) as isize),
+                w.offset((iw + i__) as isize) as *mut ::core::ffi::c_double,
+                c__.offset((j + c_dim1) as isize) as *mut ::core::ffi::c_double,
                 lc,
-                &c__1,
-                &i__3,
+                &raw const c__1,
+                &raw mut i__3,
             );
             i__2 = i__ + 1 as ::core::ffi::c_int;
             h12_(
-                &c__2,
-                &mut i__,
-                &mut i__2,
+                &raw const c__2,
+                &raw mut i__,
+                &raw mut i__2,
                 n,
-                &mut *c__.offset((i__ + c_dim1) as isize),
+                c__.offset((i__ + c_dim1) as isize) as *mut ::core::ffi::c_double,
                 lc,
-                &mut *w.offset((iw + i__) as isize),
-                &mut *e.offset(e_offset as isize),
+                w.offset((iw + i__) as isize) as *mut ::core::ffi::c_double,
+                e.offset(e_offset as isize) as *mut ::core::ffi::c_double,
                 le,
-                &c__1,
+                &raw const c__1,
                 me,
             );
             i__2 = i__ + 1 as ::core::ffi::c_int;
             h12_(
-                &c__2,
-                &mut i__,
-                &mut i__2,
+                &raw const c__2,
+                &raw mut i__,
+                &raw mut i__2,
                 n,
-                &mut *c__.offset((i__ + c_dim1) as isize),
+                c__.offset((i__ + c_dim1) as isize) as *mut ::core::ffi::c_double,
                 lc,
-                &mut *w.offset((iw + i__) as isize),
-                &mut *g.offset(g_offset as isize),
+                w.offset((iw + i__) as isize) as *mut ::core::ffi::c_double,
+                g.offset(g_offset as isize) as *mut ::core::ffi::c_double,
                 lg,
-                &c__1,
+                &raw const c__1,
                 mg,
             );
             i__ += 1;
@@ -2120,41 +2152,41 @@ unsafe fn lsei_(
         i__ = 1 as ::core::ffi::c_int;
         loop {
             if !(i__ <= i__2) {
-                current_block = 3222590281903869779;
+                current_block = 18377268871191777778;
                 break;
             }
             d__1 = *c__.offset((i__ + i__ * c_dim1) as isize);
             if (d__1).abs() < epmach {
-                current_block = 1640519170444703904;
+                current_block = 6183821358311025092;
                 break;
             }
             i__1 = i__ - 1 as ::core::ffi::c_int;
             *x.offset(i__ as isize) = (*d__.offset(i__ as isize)
                 - ddot_sl__(
-                    &mut i__1,
-                    &mut *c__.offset((i__ + c_dim1) as isize),
+                    &raw mut i__1,
+                    c__.offset((i__ + c_dim1) as isize) as *mut ::core::ffi::c_double,
                     *lc,
-                    &mut *x.offset(1 as ::core::ffi::c_int as isize),
+                    x.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                     1 as ::core::ffi::c_int,
                 ))
                 / *c__.offset((i__ + i__ * c_dim1) as isize);
             i__ += 1;
         }
         match current_block {
-            1640519170444703904 => {}
+            6183821358311025092 => {}
             _ => {
                 *mode = 1 as ::core::ffi::c_int;
                 *w.offset(mc1 as isize) = 0.0f64;
                 i__2 = *mg;
                 dcopy___(
-                    &mut i__2,
-                    w.offset(mc1 as isize),
+                    &raw mut i__2,
+                    w.offset(mc1 as isize) as *mut ::core::ffi::c_double,
                     0 as ::core::ffi::c_int,
-                    &mut *w.offset(mc1 as isize),
+                    w.offset(mc1 as isize) as *mut ::core::ffi::c_double,
                     1 as ::core::ffi::c_int,
                 );
                 if *mc == *n {
-                    current_block = 10769700236867903670;
+                    current_block = 7514739150765462945;
                 } else {
                     i__2 = *me;
                     i__ = 1 as ::core::ffi::c_int;
@@ -2163,9 +2195,10 @@ unsafe fn lsei_(
                             .offset(i__ as isize)
                             - ddot_sl__(
                                 mc,
-                                &mut *e.offset((i__ + e_dim1) as isize),
+                                e.offset((i__ + e_dim1) as isize) as *mut ::core::ffi::c_double,
                                 *le,
-                                &mut *x.offset(1 as ::core::ffi::c_int as isize),
+                                x.offset(1 as ::core::ffi::c_int as isize)
+                                    as *mut ::core::ffi::c_double,
                                 1 as ::core::ffi::c_int,
                             );
                         i__ += 1;
@@ -2174,10 +2207,11 @@ unsafe fn lsei_(
                     i__ = 1 as ::core::ffi::c_int;
                     while i__ <= i__2 {
                         dcopy___(
-                            &mut l,
-                            e.offset((i__ + mc1 * e_dim1) as isize),
+                            &raw mut l,
+                            e.offset((i__ + mc1 * e_dim1) as isize) as *mut ::core::ffi::c_double,
                             *le,
-                            &mut *w.offset((ie - 1 as ::core::ffi::c_int + i__) as isize),
+                            w.offset((ie - 1 as ::core::ffi::c_int + i__) as isize)
+                                as *mut ::core::ffi::c_double,
                             *me,
                         );
                         i__ += 1;
@@ -2186,10 +2220,11 @@ unsafe fn lsei_(
                     i__ = 1 as ::core::ffi::c_int;
                     while i__ <= i__2 {
                         dcopy___(
-                            &mut l,
-                            g.offset((i__ + mc1 * g_dim1) as isize),
+                            &raw mut l,
+                            g.offset((i__ + mc1 * g_dim1) as isize) as *mut ::core::ffi::c_double,
                             *lg,
-                            &mut *w.offset((ig - 1 as ::core::ffi::c_int + i__) as isize),
+                            w.offset((ig - 1 as ::core::ffi::c_int + i__) as isize)
+                                as *mut ::core::ffi::c_double,
                             *mg,
                         );
                         i__ += 1;
@@ -2200,42 +2235,45 @@ unsafe fn lsei_(
                         while i__ <= i__2 {
                             *h__.offset(i__ as isize) -= ddot_sl__(
                                 mc,
-                                &mut *g.offset((i__ + g_dim1) as isize),
+                                g.offset((i__ + g_dim1) as isize) as *mut ::core::ffi::c_double,
                                 *lg,
-                                &mut *x.offset(1 as ::core::ffi::c_int as isize),
+                                x.offset(1 as ::core::ffi::c_int as isize)
+                                    as *mut ::core::ffi::c_double,
                                 1 as ::core::ffi::c_int,
                             );
                             i__ += 1;
                         }
                         lsi_(
-                            &mut *w.offset(ie as isize),
-                            &mut *w.offset(if__ as isize),
-                            &mut *w.offset(ig as isize),
-                            &mut *h__.offset(1 as ::core::ffi::c_int as isize),
+                            w.offset(ie as isize) as *mut ::core::ffi::c_double,
+                            w.offset(if__ as isize) as *mut ::core::ffi::c_double,
+                            w.offset(ig as isize) as *mut ::core::ffi::c_double,
+                            h__.offset(1 as ::core::ffi::c_int as isize)
+                                as *mut ::core::ffi::c_double,
                             me,
                             me,
                             mg,
                             mg,
-                            &mut l,
-                            &mut *x.offset(mc1 as isize),
+                            &raw mut l,
+                            x.offset(mc1 as isize) as *mut ::core::ffi::c_double,
                             xnrm,
-                            &mut *w.offset(mc1 as isize),
-                            &mut *jw.offset(1 as ::core::ffi::c_int as isize),
+                            w.offset(mc1 as isize) as *mut ::core::ffi::c_double,
+                            jw.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_int,
                             mode,
                         );
                         if *mc == 0 as ::core::ffi::c_int {
-                            current_block = 1640519170444703904;
+                            current_block = 6183821358311025092;
                         } else {
                             t = dnrm2___(
                                 mc,
-                                &mut *x.offset(1 as ::core::ffi::c_int as isize),
+                                x.offset(1 as ::core::ffi::c_int as isize)
+                                    as *mut ::core::ffi::c_double,
                                 1 as ::core::ffi::c_int,
                             );
                             *xnrm = (*xnrm * *xnrm + t * t).sqrt();
                             if *mode != 1 as ::core::ffi::c_int {
-                                current_block = 1640519170444703904;
+                                current_block = 6183821358311025092;
                             } else {
-                                current_block = 10769700236867903670;
+                                current_block = 7514739150765462945;
                             }
                         }
                     } else {
@@ -2243,46 +2281,49 @@ unsafe fn lsei_(
                         k = if *le >= *n { *le } else { *n };
                         t = (epmach).sqrt();
                         hfti_(
-                            &mut *w.offset(ie as isize),
+                            w.offset(ie as isize) as *mut ::core::ffi::c_double,
                             me,
                             me,
-                            &mut l,
-                            &mut *w.offset(if__ as isize),
-                            &mut k,
-                            &c__1,
-                            &mut t,
-                            &mut krank,
+                            &raw mut l,
+                            w.offset(if__ as isize) as *mut ::core::ffi::c_double,
+                            &raw mut k,
+                            &raw const c__1,
+                            &raw mut t,
+                            &raw mut krank,
                             xnrm,
-                            &mut *w.offset(1 as ::core::ffi::c_int as isize),
-                            &mut *w.offset((l + 1 as ::core::ffi::c_int) as isize),
-                            &mut *jw.offset(1 as ::core::ffi::c_int as isize),
+                            w.offset(1 as ::core::ffi::c_int as isize)
+                                as *mut ::core::ffi::c_double,
+                            w.offset((l + 1 as ::core::ffi::c_int) as isize)
+                                as *mut ::core::ffi::c_double,
+                            jw.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_int,
                         );
                         dcopy___(
-                            &mut l,
-                            w.offset(if__ as isize),
+                            &raw mut l,
+                            w.offset(if__ as isize) as *mut ::core::ffi::c_double,
                             1 as ::core::ffi::c_int,
-                            &mut *x.offset(mc1 as isize),
+                            x.offset(mc1 as isize) as *mut ::core::ffi::c_double,
                             1 as ::core::ffi::c_int,
                         );
                         if krank != l {
-                            current_block = 1640519170444703904;
+                            current_block = 6183821358311025092;
                         } else {
                             *mode = 1 as ::core::ffi::c_int;
-                            current_block = 10769700236867903670;
+                            current_block = 7514739150765462945;
                         }
                     }
                 }
                 match current_block {
-                    1640519170444703904 => {}
+                    6183821358311025092 => {}
                     _ => {
                         i__2 = *me;
                         i__ = 1 as ::core::ffi::c_int;
                         while i__ <= i__2 {
                             *f.offset(i__ as isize) = ddot_sl__(
                                 n,
-                                &mut *e.offset((i__ + e_dim1) as isize),
+                                e.offset((i__ + e_dim1) as isize) as *mut ::core::ffi::c_double,
                                 *le,
-                                &mut *x.offset(1 as ::core::ffi::c_int as isize),
+                                x.offset(1 as ::core::ffi::c_int as isize)
+                                    as *mut ::core::ffi::c_double,
                                 1 as ::core::ffi::c_int,
                             ) - *f.offset(i__ as isize);
                             i__ += 1;
@@ -2292,15 +2333,18 @@ unsafe fn lsei_(
                         while i__ <= i__2 {
                             *d__.offset(i__ as isize) = ddot_sl__(
                                 me,
-                                &mut *e.offset((i__ * e_dim1 + 1 as ::core::ffi::c_int) as isize),
+                                e.offset((i__ * e_dim1 + 1 as ::core::ffi::c_int) as isize)
+                                    as *mut ::core::ffi::c_double,
                                 1 as ::core::ffi::c_int,
-                                &mut *f.offset(1 as ::core::ffi::c_int as isize),
+                                f.offset(1 as ::core::ffi::c_int as isize)
+                                    as *mut ::core::ffi::c_double,
                                 1 as ::core::ffi::c_int,
                             ) - ddot_sl__(
                                 mg,
-                                &mut *g.offset((i__ * g_dim1 + 1 as ::core::ffi::c_int) as isize),
+                                g.offset((i__ * g_dim1 + 1 as ::core::ffi::c_int) as isize)
+                                    as *mut ::core::ffi::c_double,
                                 1 as ::core::ffi::c_int,
-                                &mut *w.offset(mc1 as isize),
+                                w.offset(mc1 as isize) as *mut ::core::ffi::c_double,
                                 1 as ::core::ffi::c_int,
                             );
                             i__ += 1;
@@ -2309,17 +2353,18 @@ unsafe fn lsei_(
                         while i__ >= 1 as ::core::ffi::c_int {
                             i__2 = i__ + 1 as ::core::ffi::c_int;
                             h12_(
-                                &c__2,
-                                &mut i__,
-                                &mut i__2,
+                                &raw const c__2,
+                                &raw mut i__,
+                                &raw mut i__2,
                                 n,
-                                &mut *c__.offset((i__ + c_dim1) as isize),
+                                c__.offset((i__ + c_dim1) as isize) as *mut ::core::ffi::c_double,
                                 lc,
-                                &mut *w.offset((iw + i__) as isize),
-                                &mut *x.offset(1 as ::core::ffi::c_int as isize),
-                                &c__1,
-                                &c__1,
-                                &c__1,
+                                w.offset((iw + i__) as isize) as *mut ::core::ffi::c_double,
+                                x.offset(1 as ::core::ffi::c_int as isize)
+                                    as *mut ::core::ffi::c_double,
+                                &raw const c__1,
+                                &raw const c__1,
+                                &raw const c__1,
                             );
                             i__ -= 1;
                         }
@@ -2330,10 +2375,11 @@ unsafe fn lsei_(
                             i__2 = *mc - i__;
                             *w.offset(i__ as isize) = (*d__.offset(i__ as isize)
                                 - ddot_sl__(
-                                    &mut i__2,
-                                    &mut *c__.offset((j + i__ * c_dim1) as isize),
+                                    &raw mut i__2,
+                                    c__.offset((j + i__ * c_dim1) as isize)
+                                        as *mut ::core::ffi::c_double,
                                     1 as ::core::ffi::c_int,
-                                    &mut *w.offset(j as isize),
+                                    w.offset(j as isize) as *mut ::core::ffi::c_double,
                                     1 as ::core::ffi::c_int,
                                 ))
                                 / *c__.offset((i__ + i__ * c_dim1) as isize);
@@ -2344,7 +2390,7 @@ unsafe fn lsei_(
             }
         }
     }
-}}
+}
 unsafe fn lsq_(
     mut m: *mut ::core::ffi::c_int,
     mut meq: *mut ::core::ffi::c_int,
@@ -2362,7 +2408,7 @@ unsafe fn lsq_(
     mut w: *mut ::core::ffi::c_double,
     mut jw: *mut ::core::ffi::c_int,
     mut mode: *mut ::core::ffi::c_int,
-) { unsafe {
+) {
     let one: ::core::ffi::c_double = 1.0f64;
     let mut a_dim1: ::core::ffi::c_int = 0;
     let mut a_offset: ::core::ffi::c_int = 0;
@@ -2391,7 +2437,7 @@ unsafe fn lsq_(
     let mut iw: ::core::ffi::c_int = 0;
     let mut diag: ::core::ffi::c_double = 0.;
     let mut mineq: ::core::ffi::c_int = 0;
-    let mut xnorm: ::core::ffi::c_double = 0.;
+    let mut xnorm: ::core::ffi::c_double = 0.0f64;
     y = y.offset(-1);
     x = x.offset(-1);
     xu = xu.offset(-1);
@@ -2426,30 +2472,35 @@ unsafe fn lsq_(
         diag = (*l.offset(i2 as isize)).sqrt();
         *w.offset(i3 as isize) = 0.0f64;
         dcopy___(
-            &mut i1,
-            w.offset(i3 as isize),
+            &raw mut i1,
+            w.offset(i3 as isize) as *mut ::core::ffi::c_double,
             0 as ::core::ffi::c_int,
-            &mut *w.offset(i3 as isize),
+            w.offset(i3 as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
         );
         i__2 = i1 - n2;
         dcopy___(
-            &mut i__2,
-            l.offset(i2 as isize),
+            &raw mut i__2,
+            l.offset(i2 as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
-            &mut *w.offset(i3 as isize),
+            w.offset(i3 as isize) as *mut ::core::ffi::c_double,
             *n,
         );
         i__2 = i1 - n2;
-        dscal_sl__(&mut i__2, &diag, &mut *w.offset(i3 as isize), *n);
+        dscal_sl__(
+            &raw mut i__2,
+            &raw mut diag,
+            w.offset(i3 as isize) as *mut ::core::ffi::c_double,
+            *n,
+        );
         *w.offset(i3 as isize) = diag;
         i__2 = i__ - 1 as ::core::ffi::c_int;
         *w.offset((if__ - 1 as ::core::ffi::c_int + i__) as isize) = (*g.offset(i__ as isize)
             - ddot_sl__(
-                &mut i__2,
-                &mut *w.offset(i4 as isize),
+                &raw mut i__2,
+                w.offset(i4 as isize) as *mut ::core::ffi::c_double,
                 1 as ::core::ffi::c_int,
-                &mut *w.offset(if__ as isize),
+                w.offset(if__ as isize) as *mut ::core::ffi::c_double,
                 1 as ::core::ffi::c_int,
             ))
             / diag;
@@ -2462,16 +2513,21 @@ unsafe fn lsq_(
         *w.offset(i3 as isize) = *l.offset(*nl as isize);
         *w.offset(i4 as isize) = 0.0f64;
         dcopy___(
-            &mut n3,
-            w.offset(i4 as isize),
+            &raw mut n3,
+            w.offset(i4 as isize) as *mut ::core::ffi::c_double,
             0 as ::core::ffi::c_int,
-            &mut *w.offset(i4 as isize),
+            w.offset(i4 as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
         );
         *w.offset((if__ - 1 as ::core::ffi::c_int + *n) as isize) = 0.0f64;
     }
     d__1 = -one;
-    dscal_sl__(n, &d__1, &mut *w.offset(if__ as isize), 1 as ::core::ffi::c_int);
+    dscal_sl__(
+        n,
+        &raw mut d__1,
+        w.offset(if__ as isize) as *mut ::core::ffi::c_double,
+        1 as ::core::ffi::c_int,
+    );
     ic = if__ + *n;
     id = ic + *meq * *n;
     if *meq > 0 as ::core::ffi::c_int {
@@ -2480,22 +2536,28 @@ unsafe fn lsq_(
         while i__ <= i__1 {
             dcopy___(
                 n,
-                a.offset((i__ + a_dim1) as isize),
+                a.offset((i__ + a_dim1) as isize) as *mut ::core::ffi::c_double,
                 *la,
-                &mut *w.offset((ic - 1 as ::core::ffi::c_int + i__) as isize),
+                w.offset((ic - 1 as ::core::ffi::c_int + i__) as isize)
+                    as *mut ::core::ffi::c_double,
                 *meq,
             );
             i__ += 1;
         }
         dcopy___(
             meq,
-            b.offset(1 as ::core::ffi::c_int as isize),
+            b.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
-            &mut *w.offset(id as isize),
+            w.offset(id as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
         );
         d__1 = -one;
-        dscal_sl__(meq, &d__1, &mut *w.offset(id as isize), 1 as ::core::ffi::c_int);
+        dscal_sl__(
+            meq,
+            &raw mut d__1,
+            w.offset(id as isize) as *mut ::core::ffi::c_double,
+            1 as ::core::ffi::c_int,
+        );
     }
     ig = id + *meq;
     if mineq > 0 as ::core::ffi::c_int {
@@ -2504,9 +2566,10 @@ unsafe fn lsq_(
         while i__ <= i__1 {
             dcopy___(
                 n,
-                a.offset((*meq + i__ + a_dim1) as isize),
+                a.offset((*meq + i__ + a_dim1) as isize) as *mut ::core::ffi::c_double,
                 *la,
-                &mut *w.offset((ig - 1 as ::core::ffi::c_int + i__) as isize),
+                w.offset((ig - 1 as ::core::ffi::c_int + i__) as isize)
+                    as *mut ::core::ffi::c_double,
                 m1,
             );
             i__ += 1;
@@ -2519,9 +2582,9 @@ unsafe fn lsq_(
         *w.offset((ip - 1 as ::core::ffi::c_int + i__) as isize) = 0.0f64;
         dcopy___(
             n,
-            w.offset((ip - 1 as ::core::ffi::c_int + i__) as isize),
+            w.offset((ip - 1 as ::core::ffi::c_int + i__) as isize) as *mut ::core::ffi::c_double,
             0 as ::core::ffi::c_int,
-            &mut *w.offset((ip - 1 as ::core::ffi::c_int + i__) as isize),
+            w.offset((ip - 1 as ::core::ffi::c_int + i__) as isize) as *mut ::core::ffi::c_double,
             m1,
         );
         i__ += 1;
@@ -2541,9 +2604,9 @@ unsafe fn lsq_(
         *w.offset((im - 1 as ::core::ffi::c_int + i__) as isize) = 0.0f64;
         dcopy___(
             n,
-            w.offset((im - 1 as ::core::ffi::c_int + i__) as isize),
+            w.offset((im - 1 as ::core::ffi::c_int + i__) as isize) as *mut ::core::ffi::c_double,
             0 as ::core::ffi::c_int,
-            &mut *w.offset((im - 1 as ::core::ffi::c_int + i__) as isize),
+            w.offset((im - 1 as ::core::ffi::c_int + i__) as isize) as *mut ::core::ffi::c_double,
             m1,
         );
         i__ += 1;
@@ -2559,17 +2622,17 @@ unsafe fn lsq_(
     ih = ig + m1 * *n;
     if mineq > 0 as ::core::ffi::c_int {
         dcopy___(
-            &mut mineq,
-            b.offset((*meq + 1 as ::core::ffi::c_int) as isize),
+            &raw mut mineq,
+            b.offset((*meq + 1 as ::core::ffi::c_int) as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
-            &mut *w.offset(ih as isize),
+            w.offset(ih as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
         );
         d__1 = -one;
         dscal_sl__(
-            &mut mineq,
-            &d__1,
-            &mut *w.offset(ih as isize),
+            &raw mut mineq,
+            &raw mut d__1,
+            w.offset(ih as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
         );
     }
@@ -2598,45 +2661,45 @@ unsafe fn lsq_(
         *meq
     };
     lsei_(
-        &mut *w.offset(ic as isize),
-        &mut *w.offset(id as isize),
-        &mut *w.offset(ie as isize),
-        &mut *w.offset(if__ as isize),
-        &mut *w.offset(ig as isize),
-        &mut *w.offset(ih as isize),
-        &mut i__1,
+        w.offset(ic as isize) as *mut ::core::ffi::c_double,
+        w.offset(id as isize) as *mut ::core::ffi::c_double,
+        w.offset(ie as isize) as *mut ::core::ffi::c_double,
+        w.offset(if__ as isize) as *mut ::core::ffi::c_double,
+        w.offset(ig as isize) as *mut ::core::ffi::c_double,
+        w.offset(ih as isize) as *mut ::core::ffi::c_double,
+        &raw mut i__1,
         meq,
         n,
         n,
-        &mut m1,
-        &mut m1,
+        &raw mut m1,
+        &raw mut m1,
         n,
-        &mut *x.offset(1 as ::core::ffi::c_int as isize),
-        &mut xnorm,
-        &mut *w.offset(iw as isize),
-        &mut *jw.offset(1 as ::core::ffi::c_int as isize),
+        x.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+        &raw mut xnorm,
+        w.offset(iw as isize) as *mut ::core::ffi::c_double,
+        jw.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_int,
         mode,
     );
     if *mode == 1 as ::core::ffi::c_int {
         dcopy___(
             m,
-            w.offset(iw as isize),
+            w.offset(iw as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
-            &mut *y.offset(1 as ::core::ffi::c_int as isize),
-            1 as ::core::ffi::c_int,
-        );
-        dcopy___(
-            &mut n3,
-            w.offset((iw + *m) as isize),
-            1 as ::core::ffi::c_int,
-            &mut *y.offset((*m + 1 as ::core::ffi::c_int) as isize),
+            y.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
         );
         dcopy___(
-            &mut n3,
-            w.offset((iw + *m + *n) as isize),
+            &raw mut n3,
+            w.offset((iw + *m) as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
-            &mut *y.offset((*m + n3 + 1 as ::core::ffi::c_int) as isize),
+            y.offset((*m + 1 as ::core::ffi::c_int) as isize) as *mut ::core::ffi::c_double,
+            1 as ::core::ffi::c_int,
+        );
+        dcopy___(
+            &raw mut n3,
+            w.offset((iw + *m + *n) as isize) as *mut ::core::ffi::c_double,
+            1 as ::core::ffi::c_int,
+            y.offset((*m + n3 + 1 as ::core::ffi::c_int) as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
         );
         i__1 = *n;
@@ -2650,14 +2713,14 @@ unsafe fn lsq_(
             i__ += 1;
         }
     }
-}}
+}
 unsafe fn ldl_(
     mut n: *mut ::core::ffi::c_int,
     mut a: *mut ::core::ffi::c_double,
     mut z__: *mut ::core::ffi::c_double,
     mut sigma: *mut ::core::ffi::c_double,
     mut w: *mut ::core::ffi::c_double,
-) { unsafe {
+) {
     let one: ::core::ffi::c_double = 1.0f64;
     let four: ::core::ffi::c_double = 4.0f64;
     let epmach: ::core::ffi::c_double = 2.22e-16f64;
@@ -2758,7 +2821,7 @@ unsafe fn ldl_(
             i__ += 1;
         }
     }
-}}
+}
 unsafe fn slsqpb_(
     mut m: *mut ::core::ffi::c_int,
     mut meq: *mut ::core::ffi::c_int,
@@ -2784,7 +2847,7 @@ unsafe fn slsqpb_(
     mut w: *mut ::core::ffi::c_double,
     mut iw: *mut ::core::ffi::c_int,
     mut state: *mut slsqpb_state,
-) { unsafe {
+) {
     let mut current_block: u64;
     let one: ::core::ffi::c_double = 1.0f64;
     let alfmin: ::core::ffi::c_double = 0.1f64;
@@ -2860,9 +2923,10 @@ unsafe fn slsqpb_(
             *u.offset(i__ as isize) = *g.offset(i__ as isize)
                 - ddot_sl__(
                     m,
-                    &mut *a.offset((i__ * a_dim1 + 1 as ::core::ffi::c_int) as isize),
+                    a.offset((i__ * a_dim1 + 1 as ::core::ffi::c_int) as isize)
+                        as *mut ::core::ffi::c_double,
                     1 as ::core::ffi::c_int,
-                    &mut *r__.offset(1 as ::core::ffi::c_int as isize),
+                    r__.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                     1 as ::core::ffi::c_int,
                 )
                 - *v.offset(i__ as isize);
@@ -2908,16 +2972,16 @@ unsafe fn slsqpb_(
         }
         h1 = ddot_sl__(
             n,
-            &mut *s.offset(1 as ::core::ffi::c_int as isize),
+            s.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
-            &mut *u.offset(1 as ::core::ffi::c_int as isize),
+            u.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
         );
         h2 = ddot_sl__(
             n,
-            &mut *s.offset(1 as ::core::ffi::c_int as isize),
+            s.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
-            &mut *v.offset(1 as ::core::ffi::c_int as isize),
+            v.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
         );
         h3 = h2 * 0.2f64;
@@ -2926,37 +2990,37 @@ unsafe fn slsqpb_(
             h1 = h3;
             dscal_sl__(
                 n,
-                &h4,
-                &mut *u.offset(1 as ::core::ffi::c_int as isize),
+                &raw mut h4,
+                u.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                 1 as ::core::ffi::c_int,
             );
             d__1 = one - h4;
             daxpy_sl__(
                 n,
-                &d__1,
-                v.offset(1 as ::core::ffi::c_int as isize),
+                &raw mut d__1,
+                v.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                 1 as ::core::ffi::c_int,
-                &mut *u.offset(1 as ::core::ffi::c_int as isize),
+                u.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                 1 as ::core::ffi::c_int,
             );
         }
         d__1 = one / h1;
         ldl_(
             n,
-            &mut *l.offset(1 as ::core::ffi::c_int as isize),
-            &mut *u.offset(1 as ::core::ffi::c_int as isize),
-            &mut d__1,
-            &mut *v.offset(1 as ::core::ffi::c_int as isize),
+            l.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+            u.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+            &raw mut d__1,
+            v.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
         );
         d__1 = -one / h2;
         ldl_(
             n,
-            &mut *l.offset(1 as ::core::ffi::c_int as isize),
-            &mut *v.offset(1 as ::core::ffi::c_int as isize),
-            &mut d__1,
-            &mut *u.offset(1 as ::core::ffi::c_int as isize),
+            l.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+            v.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+            &raw mut d__1,
+            u.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
         );
-        current_block = 6888897117580844842;
+        current_block = 17565015850456805979;
     } else if *mode == 0 as ::core::ffi::c_int {
         itermx = *iter;
         if *acc >= 0.0f64 {
@@ -2975,19 +3039,19 @@ unsafe fn slsqpb_(
         *mu.offset(1 as ::core::ffi::c_int as isize) = 0.0f64;
         dcopy___(
             n,
-            s.offset(1 as ::core::ffi::c_int as isize),
+            s.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
             0 as ::core::ffi::c_int,
-            &mut *s.offset(1 as ::core::ffi::c_int as isize),
+            s.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
         );
         dcopy___(
             m,
-            mu.offset(1 as ::core::ffi::c_int as isize),
+            mu.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
             0 as ::core::ffi::c_int,
-            &mut *mu.offset(1 as ::core::ffi::c_int as isize),
+            mu.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
             1 as ::core::ffi::c_int,
         );
-        current_block = 10732253873254351846;
+        current_block = 14140784183277947939;
     } else {
         t = *f;
         i__1 = *m;
@@ -3005,16 +3069,16 @@ unsafe fn slsqpb_(
         h1 = t - t0;
         match iexact + 1 as ::core::ffi::c_int {
             1 => {
-                current_block = 11231496966810938197;
+                current_block = 15522146559271336860;
                 match current_block {
-                    11231496966810938197 => {
+                    15522146559271336860 => {
                         if nlopt_isfinite(h1) != 0 {
                             if h1 <= h3 / ten || line > 10 as ::core::ffi::c_int {
-                                current_block = 2367719738530698383;
+                                current_block = 2101818066333513453;
                             } else {
                                 d__1 = h3 / (two * (h3 - h1));
                                 alpha = if d__1 >= alfmin { d__1 } else { alfmin };
-                                current_block = 18018047807550034048;
+                                current_block = 11187960484546229445;
                             }
                         } else {
                             alpha = if alpha * 0.5f64 >= alfmin {
@@ -3022,13 +3086,13 @@ unsafe fn slsqpb_(
                             } else {
                                 alfmin
                             };
-                            current_block = 18018047807550034048;
+                            current_block = 11187960484546229445;
                         }
                     }
                     _ => {}
                 }
                 match current_block {
-                    18018047807550034048 => {}
+                    11187960484546229445 => {}
                     _ => {
                         h3 = 0.0f64;
                         i__1 = *m;
@@ -3047,7 +3111,8 @@ unsafe fn slsqpb_(
                         if ((d__1).abs() < *acc
                             || dnrm2___(
                                 n,
-                                &mut *s.offset(1 as ::core::ffi::c_int as isize),
+                                s.offset(1 as ::core::ffi::c_int as isize)
+                                    as *mut ::core::ffi::c_double,
                                 1 as ::core::ffi::c_int,
                             ) < *acc)
                             && h3 < *acc
@@ -3056,24 +3121,24 @@ unsafe fn slsqpb_(
                         } else {
                             *mode = -(1 as ::core::ffi::c_int);
                         }
-                        current_block = 10145886053577303292;
+                        current_block = 7663700016002789541;
                     }
                 }
             }
             2 => {
-                current_block = 18080407663732281061;
+                current_block = 15447661902298937816;
             }
             _ => {
-                current_block = 2367719738530698383;
+                current_block = 2101818066333513453;
                 match current_block {
-                    11231496966810938197 => {
+                    15522146559271336860 => {
                         if nlopt_isfinite(h1) != 0 {
                             if h1 <= h3 / ten || line > 10 as ::core::ffi::c_int {
-                                current_block = 2367719738530698383;
+                                current_block = 2101818066333513453;
                             } else {
                                 d__1 = h3 / (two * (h3 - h1));
                                 alpha = if d__1 >= alfmin { d__1 } else { alfmin };
-                                current_block = 18018047807550034048;
+                                current_block = 11187960484546229445;
                             }
                         } else {
                             alpha = if alpha * 0.5f64 >= alfmin {
@@ -3081,13 +3146,13 @@ unsafe fn slsqpb_(
                             } else {
                                 alfmin
                             };
-                            current_block = 18018047807550034048;
+                            current_block = 11187960484546229445;
                         }
                     }
                     _ => {}
                 }
                 match current_block {
-                    18018047807550034048 => {}
+                    11187960484546229445 => {}
                     _ => {
                         h3 = 0.0f64;
                         i__1 = *m;
@@ -3106,7 +3171,8 @@ unsafe fn slsqpb_(
                         if ((d__1).abs() < *acc
                             || dnrm2___(
                                 n,
-                                &mut *s.offset(1 as ::core::ffi::c_int as isize),
+                                s.offset(1 as ::core::ffi::c_int as isize)
+                                    as *mut ::core::ffi::c_double,
                                 1 as ::core::ffi::c_int,
                             ) < *acc)
                             && h3 < *acc
@@ -3115,40 +3181,40 @@ unsafe fn slsqpb_(
                         } else {
                             *mode = -(1 as ::core::ffi::c_int);
                         }
-                        current_block = 10145886053577303292;
+                        current_block = 7663700016002789541;
                     }
                 }
             }
         }
     }
-    'c_6480: loop {
+    '_L330: loop {
         match current_block {
-            18080407663732281061 => {
+            15447661902298937816 => {
                 *mode = 9 as ::core::ffi::c_int;
                 return;
             }
-            18018047807550034048 => {
+            11187960484546229445 => {
                 line += 1;
                 h3 = alpha * h3;
                 dscal_sl__(
                     n,
-                    &alpha,
-                    &mut *s.offset(1 as ::core::ffi::c_int as isize),
+                    &raw mut alpha,
+                    s.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                     1 as ::core::ffi::c_int,
                 );
                 dcopy___(
                     n,
-                    x0.offset(1 as ::core::ffi::c_int as isize),
+                    x0.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                     1 as ::core::ffi::c_int,
-                    &mut *x.offset(1 as ::core::ffi::c_int as isize),
+                    x.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                     1 as ::core::ffi::c_int,
                 );
                 daxpy_sl__(
                     n,
-                    &one,
-                    s.offset(1 as ::core::ffi::c_int as isize),
+                    &raw const one,
+                    s.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                     1 as ::core::ffi::c_int,
-                    &mut *x.offset(1 as ::core::ffi::c_int as isize),
+                    x.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                     1 as ::core::ffi::c_int,
                 );
                 i__1 = *n;
@@ -3166,227 +3232,238 @@ unsafe fn slsqpb_(
                 } else {
                     1 as ::core::ffi::c_int
                 };
-                current_block = 10145886053577303292;
+                current_block = 7663700016002789541;
             }
-            6888897117580844842 => {
+            17565015850456805979 => {
                 *iter += 1;
                 *mode = 9 as ::core::ffi::c_int;
                 if *iter > itermx && itermx > 0 as ::core::ffi::c_int {
-                    current_block = 10145886053577303292;
-                } else {
-                    dcopy___(
-                        n,
-                        &*xl.offset(1 as ::core::ffi::c_int as isize),
-                        1 as ::core::ffi::c_int,
-                        &mut *u.offset(1 as ::core::ffi::c_int as isize),
-                        1 as ::core::ffi::c_int,
-                    );
-                    dcopy___(
-                        n,
-                        &*xu.offset(1 as ::core::ffi::c_int as isize),
-                        1 as ::core::ffi::c_int,
-                        &mut *v.offset(1 as ::core::ffi::c_int as isize),
-                        1 as ::core::ffi::c_int,
-                    );
-                    d__1 = -one;
-                    daxpy_sl__(
-                        n,
-                        &d__1,
-                        x.offset(1 as ::core::ffi::c_int as isize),
-                        1 as ::core::ffi::c_int,
-                        &mut *u.offset(1 as ::core::ffi::c_int as isize),
-                        1 as ::core::ffi::c_int,
-                    );
-                    d__1 = -one;
-                    daxpy_sl__(
-                        n,
-                        &d__1,
-                        x.offset(1 as ::core::ffi::c_int as isize),
-                        1 as ::core::ffi::c_int,
-                        &mut *v.offset(1 as ::core::ffi::c_int as isize),
-                        1 as ::core::ffi::c_int,
-                    );
-                    h4 = one;
-                    lsq_(
-                        m,
-                        meq,
-                        n,
-                        &mut n3,
-                        la,
-                        &mut *l.offset(1 as ::core::ffi::c_int as isize),
-                        &mut *g.offset(1 as ::core::ffi::c_int as isize),
-                        &mut *a.offset(a_offset as isize),
-                        &mut *c__.offset(1 as ::core::ffi::c_int as isize),
-                        u.offset(1 as ::core::ffi::c_int as isize),
-                        v.offset(1 as ::core::ffi::c_int as isize),
-                        &mut *s.offset(1 as ::core::ffi::c_int as isize),
-                        &mut *r__.offset(1 as ::core::ffi::c_int as isize),
-                        &mut *w.offset(1 as ::core::ffi::c_int as isize),
-                        &mut *iw.offset(1 as ::core::ffi::c_int as isize),
-                        mode,
-                    );
-                    if *mode == 6 as ::core::ffi::c_int {
-                        if *n == *meq {
-                            *mode = 4 as ::core::ffi::c_int;
-                        }
-                    }
-                    if *mode == 4 as ::core::ffi::c_int {
-                        i__1 = *m;
-                        j = 1 as ::core::ffi::c_int;
-                        while j <= i__1 {
-                            if j <= *meq {
-                                *a.offset((j + n1 * a_dim1) as isize) = -*c__.offset(j as isize);
-                            } else {
-                                d__1 = -*c__.offset(j as isize);
-                                *a.offset((j + n1 * a_dim1) as isize) =
-                                    if d__1 >= 0.0f64 { d__1 } else { 0.0f64 };
-                            }
-                            j += 1;
-                        }
-                        *s.offset(1 as ::core::ffi::c_int as isize) = 0.0f64;
-                        dcopy___(
-                            n,
-                            s.offset(1 as ::core::ffi::c_int as isize),
-                            0 as ::core::ffi::c_int,
-                            &mut *s.offset(1 as ::core::ffi::c_int as isize),
-                            1 as ::core::ffi::c_int,
-                        );
-                        h3 = 0.0f64;
-                        *g.offset(n1 as isize) = 0.0f64;
-                        *l.offset(n3 as isize) = hun;
-                        *s.offset(n1 as isize) = one;
-                        *u.offset(n1 as isize) = 0.0f64;
-                        *v.offset(n1 as isize) = one;
-                        incons = 0 as ::core::ffi::c_int;
-                        loop {
-                            lsq_(
-                                m,
-                                meq,
-                                &mut n1,
-                                &mut n3,
-                                la,
-                                &mut *l.offset(1 as ::core::ffi::c_int as isize),
-                                &mut *g.offset(1 as ::core::ffi::c_int as isize),
-                                &mut *a.offset(a_offset as isize),
-                                &mut *c__.offset(1 as ::core::ffi::c_int as isize),
-                                u.offset(1 as ::core::ffi::c_int as isize),
-                                v.offset(1 as ::core::ffi::c_int as isize),
-                                &mut *s.offset(1 as ::core::ffi::c_int as isize),
-                                &mut *r__.offset(1 as ::core::ffi::c_int as isize),
-                                &mut *w.offset(1 as ::core::ffi::c_int as isize),
-                                &mut *iw.offset(1 as ::core::ffi::c_int as isize),
-                                mode,
-                            );
-                            h4 = one - *s.offset(n1 as isize);
-                            if !(*mode == 4 as ::core::ffi::c_int) {
-                                break;
-                            }
-                            *l.offset(n3 as isize) = ten * *l.offset(n3 as isize);
-                            incons += 1;
-                            if incons > 5 as ::core::ffi::c_int {
-                                current_block = 10145886053577303292;
-                                continue 'c_6480;
-                            }
-                        }
-                        if *mode != 1 as ::core::ffi::c_int {
-                            current_block = 10145886053577303292;
-                            continue;
-                        }
-                    } else if *mode != 1 as ::core::ffi::c_int {
-                        current_block = 10145886053577303292;
-                        continue;
-                    }
-                    i__1 = *n;
-                    i__ = 1 as ::core::ffi::c_int;
-                    while i__ <= i__1 {
-                        *v.offset(i__ as isize) = *g.offset(i__ as isize)
-                            - ddot_sl__(
-                                m,
-                                &mut *a.offset((i__ * a_dim1 + 1 as ::core::ffi::c_int) as isize),
-                                1 as ::core::ffi::c_int,
-                                &mut *r__.offset(1 as ::core::ffi::c_int as isize),
-                                1 as ::core::ffi::c_int,
-                            );
-                        i__ += 1;
-                    }
-                    f0 = *f;
-                    dcopy___(
-                        n,
-                        x.offset(1 as ::core::ffi::c_int as isize),
-                        1 as ::core::ffi::c_int,
-                        &mut *x0.offset(1 as ::core::ffi::c_int as isize),
-                        1 as ::core::ffi::c_int,
-                    );
-                    gs = ddot_sl__(
-                        n,
-                        &mut *g.offset(1 as ::core::ffi::c_int as isize),
-                        1 as ::core::ffi::c_int,
-                        &mut *s.offset(1 as ::core::ffi::c_int as isize),
-                        1 as ::core::ffi::c_int,
-                    );
-                    h1 = (gs).abs();
-                    h2 = 0.0f64;
-                    i__1 = *m;
-                    j = 1 as ::core::ffi::c_int;
-                    while j <= i__1 {
-                        if j <= *meq {
-                            h3 = *c__.offset(j as isize);
-                        } else {
-                            h3 = 0.0f64;
-                        }
-                        d__1 = -*c__.offset(j as isize);
-                        h2 += if d__1 >= h3 { d__1 } else { h3 };
-                        d__1 = *r__.offset(j as isize);
-                        h3 = (d__1).abs();
-                        d__1 = h3;
-                        d__2 = (*mu.offset(j as isize) + h3) / two;
-                        *mu.offset(j as isize) = if d__1 >= d__2 { d__1 } else { d__2 };
-                        d__1 = *c__.offset(j as isize);
-                        h1 += h3 * (d__1).abs();
-                        j += 1;
-                    }
-                    *mode = 0 as ::core::ffi::c_int;
-                    if h1 < *acc && h2 < *acc {
-                        current_block = 10145886053577303292;
-                        continue;
-                    }
-                    h1 = 0.0f64;
-                    i__1 = *m;
-                    j = 1 as ::core::ffi::c_int;
-                    while j <= i__1 {
-                        if j <= *meq {
-                            h3 = *c__.offset(j as isize);
-                        } else {
-                            h3 = 0.0f64;
-                        }
-                        d__1 = -*c__.offset(j as isize);
-                        h1 += *mu.offset(j as isize) * (if d__1 >= h3 { d__1 } else { h3 });
-                        j += 1;
-                    }
-                    t0 = *f + h1;
-                    h3 = gs - h1 * h4;
-                    *mode = 8 as ::core::ffi::c_int;
-                    if h3 >= 0.0f64 {
-                        current_block = 10732253873254351846;
-                        continue;
-                    }
-                    line = 0 as ::core::ffi::c_int;
-                    alpha = one;
-                    if iexact == 1 as ::core::ffi::c_int {
-                        current_block = 18080407663732281061;
-                    } else {
-                        current_block = 18018047807550034048;
+                    current_block = 7663700016002789541;
+                    continue;
+                }
+                dcopy___(
+                    n,
+                    xl.offset(1 as ::core::ffi::c_int as isize) as *const ::core::ffi::c_double,
+                    1 as ::core::ffi::c_int,
+                    u.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                    1 as ::core::ffi::c_int,
+                );
+                dcopy___(
+                    n,
+                    xu.offset(1 as ::core::ffi::c_int as isize) as *const ::core::ffi::c_double,
+                    1 as ::core::ffi::c_int,
+                    v.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                    1 as ::core::ffi::c_int,
+                );
+                d__1 = -one;
+                daxpy_sl__(
+                    n,
+                    &raw mut d__1,
+                    x.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                    1 as ::core::ffi::c_int,
+                    u.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                    1 as ::core::ffi::c_int,
+                );
+                d__1 = -one;
+                daxpy_sl__(
+                    n,
+                    &raw mut d__1,
+                    x.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                    1 as ::core::ffi::c_int,
+                    v.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                    1 as ::core::ffi::c_int,
+                );
+                h4 = one;
+                lsq_(
+                    m,
+                    meq,
+                    n,
+                    &raw mut n3,
+                    la,
+                    l.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                    g.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                    a.offset(a_offset as isize) as *mut ::core::ffi::c_double,
+                    c__.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                    u.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                    v.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                    s.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                    r__.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                    w.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                    iw.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_int,
+                    mode,
+                );
+                if *mode == 6 as ::core::ffi::c_int {
+                    if *n == *meq {
+                        *mode = 4 as ::core::ffi::c_int;
                     }
                 }
+                if *mode == 4 as ::core::ffi::c_int {
+                    i__1 = *m;
+                    j = 1 as ::core::ffi::c_int;
+                    while j <= i__1 {
+                        if j <= *meq {
+                            *a.offset((j + n1 * a_dim1) as isize) = -*c__.offset(j as isize);
+                        } else {
+                            d__1 = -*c__.offset(j as isize);
+                            *a.offset((j + n1 * a_dim1) as isize) =
+                                if d__1 >= 0.0f64 { d__1 } else { 0.0f64 };
+                        }
+                        j += 1;
+                    }
+                    *s.offset(1 as ::core::ffi::c_int as isize) = 0.0f64;
+                    dcopy___(
+                        n,
+                        s.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                        0 as ::core::ffi::c_int,
+                        s.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                        1 as ::core::ffi::c_int,
+                    );
+                    h3 = 0.0f64;
+                    *g.offset(n1 as isize) = 0.0f64;
+                    *l.offset(n3 as isize) = hun;
+                    *s.offset(n1 as isize) = one;
+                    *u.offset(n1 as isize) = 0.0f64;
+                    *v.offset(n1 as isize) = one;
+                    incons = 0 as ::core::ffi::c_int;
+                    loop {
+                        lsq_(
+                            m,
+                            meq,
+                            &raw mut n1,
+                            &raw mut n3,
+                            la,
+                            l.offset(1 as ::core::ffi::c_int as isize)
+                                as *mut ::core::ffi::c_double,
+                            g.offset(1 as ::core::ffi::c_int as isize)
+                                as *mut ::core::ffi::c_double,
+                            a.offset(a_offset as isize) as *mut ::core::ffi::c_double,
+                            c__.offset(1 as ::core::ffi::c_int as isize)
+                                as *mut ::core::ffi::c_double,
+                            u.offset(1 as ::core::ffi::c_int as isize)
+                                as *mut ::core::ffi::c_double,
+                            v.offset(1 as ::core::ffi::c_int as isize)
+                                as *mut ::core::ffi::c_double,
+                            s.offset(1 as ::core::ffi::c_int as isize)
+                                as *mut ::core::ffi::c_double,
+                            r__.offset(1 as ::core::ffi::c_int as isize)
+                                as *mut ::core::ffi::c_double,
+                            w.offset(1 as ::core::ffi::c_int as isize)
+                                as *mut ::core::ffi::c_double,
+                            iw.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_int,
+                            mode,
+                        );
+                        h4 = one - *s.offset(n1 as isize);
+                        if !(*mode == 4 as ::core::ffi::c_int) {
+                            break;
+                        }
+                        *l.offset(n3 as isize) = ten * *l.offset(n3 as isize);
+                        incons += 1;
+                        if incons > 5 as ::core::ffi::c_int {
+                            current_block = 7663700016002789541;
+                            continue '_L330;
+                        }
+                    }
+                    if *mode != 1 as ::core::ffi::c_int {
+                        current_block = 7663700016002789541;
+                        continue;
+                    }
+                } else if *mode != 1 as ::core::ffi::c_int {
+                    current_block = 7663700016002789541;
+                    continue;
+                }
+                i__1 = *n;
+                i__ = 1 as ::core::ffi::c_int;
+                while i__ <= i__1 {
+                    *v.offset(i__ as isize) = *g.offset(i__ as isize)
+                        - ddot_sl__(
+                            m,
+                            a.offset((i__ * a_dim1 + 1 as ::core::ffi::c_int) as isize)
+                                as *mut ::core::ffi::c_double,
+                            1 as ::core::ffi::c_int,
+                            r__.offset(1 as ::core::ffi::c_int as isize)
+                                as *mut ::core::ffi::c_double,
+                            1 as ::core::ffi::c_int,
+                        );
+                    i__ += 1;
+                }
+                f0 = *f;
+                dcopy___(
+                    n,
+                    x.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                    1 as ::core::ffi::c_int,
+                    x0.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                    1 as ::core::ffi::c_int,
+                );
+                gs = ddot_sl__(
+                    n,
+                    g.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                    1 as ::core::ffi::c_int,
+                    s.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+                    1 as ::core::ffi::c_int,
+                );
+                h1 = (gs).abs();
+                h2 = 0.0f64;
+                i__1 = *m;
+                j = 1 as ::core::ffi::c_int;
+                while j <= i__1 {
+                    if j <= *meq {
+                        h3 = *c__.offset(j as isize);
+                    } else {
+                        h3 = 0.0f64;
+                    }
+                    d__1 = -*c__.offset(j as isize);
+                    h2 += if d__1 >= h3 { d__1 } else { h3 };
+                    d__1 = *r__.offset(j as isize);
+                    h3 = (d__1).abs();
+                    d__1 = h3;
+                    d__2 = (*mu.offset(j as isize) + h3) / two;
+                    *mu.offset(j as isize) = if d__1 >= d__2 { d__1 } else { d__2 };
+                    d__1 = *c__.offset(j as isize);
+                    h1 += h3 * (d__1).abs();
+                    j += 1;
+                }
+                *mode = 0 as ::core::ffi::c_int;
+                if h1 < *acc && h2 < *acc {
+                    current_block = 7663700016002789541;
+                    continue;
+                }
+                h1 = 0.0f64;
+                i__1 = *m;
+                j = 1 as ::core::ffi::c_int;
+                while j <= i__1 {
+                    if j <= *meq {
+                        h3 = *c__.offset(j as isize);
+                    } else {
+                        h3 = 0.0f64;
+                    }
+                    d__1 = -*c__.offset(j as isize);
+                    h1 += *mu.offset(j as isize) * (if d__1 >= h3 { d__1 } else { h3 });
+                    j += 1;
+                }
+                t0 = *f + h1;
+                h3 = gs - h1 * h4;
+                *mode = 8 as ::core::ffi::c_int;
+                if h3 >= 0.0f64 {
+                    current_block = 14140784183277947939;
+                    continue;
+                }
+                line = 0 as ::core::ffi::c_int;
+                alpha = one;
+                if iexact == 1 as ::core::ffi::c_int {
+                    current_block = 15447661902298937816;
+                } else {
+                    current_block = 11187960484546229445;
+                }
             }
-            10732253873254351846 => {
+            14140784183277947939 => {
                 ireset += 1;
                 if ireset > 5 as ::core::ffi::c_int {
                     d__1 = *f - f0;
                     if ((d__1).abs() < tol
                         || dnrm2___(
                             n,
-                            &mut *s.offset(1 as ::core::ffi::c_int as isize),
+                            s.offset(1 as ::core::ffi::c_int as isize)
+                                as *mut ::core::ffi::c_double,
                             1 as ::core::ffi::c_int,
                         ) < tol)
                         && h3 < tol
@@ -3395,14 +3472,14 @@ unsafe fn slsqpb_(
                     } else {
                         *mode = 8 as ::core::ffi::c_int;
                     }
-                    current_block = 10145886053577303292;
+                    current_block = 7663700016002789541;
                 } else {
                     *l.offset(1 as ::core::ffi::c_int as isize) = 0.0f64;
                     dcopy___(
-                        &mut n2,
-                        l.offset(1 as ::core::ffi::c_int as isize),
+                        &raw mut n2,
+                        l.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                         0 as ::core::ffi::c_int,
-                        &mut *l.offset(1 as ::core::ffi::c_int as isize),
+                        l.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
                         1 as ::core::ffi::c_int,
                     );
                     j = 1 as ::core::ffi::c_int;
@@ -3413,7 +3490,7 @@ unsafe fn slsqpb_(
                         j = j + n1 - i__;
                         i__ += 1;
                     }
-                    current_block = 6888897117580844842;
+                    current_block = 17565015850456805979;
                 }
             }
             _ => {
@@ -3439,7 +3516,7 @@ unsafe fn slsqpb_(
             }
         }
     }
-}}
+}
 unsafe fn slsqp(
     mut m: *mut ::core::ffi::c_int,
     mut meq: *mut ::core::ffi::c_int,
@@ -3460,7 +3537,7 @@ unsafe fn slsqp(
     mut jw: *mut ::core::ffi::c_int,
     mut l_jw__: *mut ::core::ffi::c_int,
     mut state: *mut slsqpb_state,
-) { unsafe {
+) {
     let mut a_dim1: ::core::ffi::c_int = 0;
     let mut a_offset: ::core::ffi::c_int = 0;
     let mut i__1: ::core::ffi::c_int = 0;
@@ -3540,37 +3617,36 @@ unsafe fn slsqp(
         meq,
         la,
         n,
-        &mut *x.offset(1 as ::core::ffi::c_int as isize),
-        &*xl.offset(1 as ::core::ffi::c_int as isize),
-        &*xu.offset(1 as ::core::ffi::c_int as isize),
+        x.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+        xl.offset(1 as ::core::ffi::c_int as isize) as *const ::core::ffi::c_double,
+        xu.offset(1 as ::core::ffi::c_int as isize) as *const ::core::ffi::c_double,
         f,
-        &mut *c__.offset(1 as ::core::ffi::c_int as isize),
-        &mut *g.offset(1 as ::core::ffi::c_int as isize),
-        &mut *a.offset(a_offset as isize),
+        c__.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+        g.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_double,
+        a.offset(a_offset as isize) as *mut ::core::ffi::c_double,
         acc,
         iter,
         mode,
-        &mut *w.offset(ir as isize),
-        &mut *w.offset(il as isize),
-        &mut *w.offset(ix as isize),
-        &mut *w.offset(im as isize),
-        &mut *w.offset(is as isize),
-        &mut *w.offset(iu as isize),
-        &mut *w.offset(iv as isize),
-        &mut *w.offset(iw as isize),
-        &mut *jw.offset(1 as ::core::ffi::c_int as isize),
+        w.offset(ir as isize) as *mut ::core::ffi::c_double,
+        w.offset(il as isize) as *mut ::core::ffi::c_double,
+        w.offset(ix as isize) as *mut ::core::ffi::c_double,
+        w.offset(im as isize) as *mut ::core::ffi::c_double,
+        w.offset(is as isize) as *mut ::core::ffi::c_double,
+        w.offset(iu as isize) as *mut ::core::ffi::c_double,
+        w.offset(iv as isize) as *mut ::core::ffi::c_double,
+        w.offset(iw as isize) as *mut ::core::ffi::c_double,
+        jw.offset(1 as ::core::ffi::c_int as isize) as *mut ::core::ffi::c_int,
         state,
     );
-    let ref mut fresh1 = (*state).x0;
-    *fresh1 = &mut *w.offset(ix as isize) as *mut ::core::ffi::c_double;
-}}
+    (*state).x0 = w.offset(ix as isize) as *mut ::core::ffi::c_double;
+}
 unsafe fn length_work(
     mut LEN_W: *mut ::core::ffi::c_int,
     mut LEN_JW: *mut ::core::ffi::c_int,
     mut M: ::core::ffi::c_int,
     mut MEQ: ::core::ffi::c_int,
     mut N: ::core::ffi::c_int,
-) { unsafe {
+) {
     let mut N1: ::core::ffi::c_int = N + 1 as ::core::ffi::c_int;
     let mut MINEQ: ::core::ffi::c_int = M - MEQ + N1 + N1;
     *LEN_W = (3 as ::core::ffi::c_int * N1 + M) * (N1 + 1 as ::core::ffi::c_int)
@@ -3585,7 +3661,7 @@ unsafe fn length_work(
         + 3 as ::core::ffi::c_int * N1
         + 1 as ::core::ffi::c_int;
     *LEN_JW = MINEQ;
-}}
+}
 
 pub(crate) unsafe fn nlopt_slsqp<U>(
     mut n: ::core::ffi::c_uint,
@@ -3600,7 +3676,7 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
     mut x: *mut ::core::ffi::c_double,
     mut minf: *mut ::core::ffi::c_double,
     mut stop: *mut nlopt_stopping,
-) -> nlopt_result { unsafe {
+) -> nlopt_result {
     let mut current_block: u64;
     let mut state: slsqpb_state = slsqpb_state {
         t: 0 as ::core::ffi::c_int as ::core::ffi::c_double,
@@ -3621,21 +3697,20 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
         incons: 0 as ::core::ffi::c_int,
         ireset: 0 as ::core::ffi::c_int,
         itermx: 0 as ::core::ffi::c_int,
-        x0: 0 as *mut ::core::ffi::c_double,
+        x0: ::core::ptr::null_mut::<::core::ffi::c_double>(),
     };
-
     let mut mtot: ::core::ffi::c_uint = nlopt_count_constraints(m, fc);
     let mut ptot: ::core::ffi::c_uint = nlopt_count_constraints(p, h);
-    let mut work: *mut ::core::ffi::c_double = 0 as *mut ::core::ffi::c_double;
-    let mut cgrad: *mut ::core::ffi::c_double = 0 as *mut ::core::ffi::c_double;
-    let mut c: *mut ::core::ffi::c_double = 0 as *mut ::core::ffi::c_double;
-    let mut grad: *mut ::core::ffi::c_double = 0 as *mut ::core::ffi::c_double;
-    let mut w: *mut ::core::ffi::c_double = 0 as *mut ::core::ffi::c_double;
+    let mut work: *mut ::core::ffi::c_double = ::core::ptr::null_mut::<::core::ffi::c_double>();
+    let mut cgrad: *mut ::core::ffi::c_double = ::core::ptr::null_mut::<::core::ffi::c_double>();
+    let mut c: *mut ::core::ffi::c_double = ::core::ptr::null_mut::<::core::ffi::c_double>();
+    let mut grad: *mut ::core::ffi::c_double = ::core::ptr::null_mut::<::core::ffi::c_double>();
+    let mut w: *mut ::core::ffi::c_double = ::core::ptr::null_mut::<::core::ffi::c_double>();
     let mut fcur: ::core::ffi::c_double = 0.;
-    let mut xcur: *mut ::core::ffi::c_double = 0 as *mut ::core::ffi::c_double;
+    let mut xcur: *mut ::core::ffi::c_double = ::core::ptr::null_mut::<::core::ffi::c_double>();
     let mut fprev: ::core::ffi::c_double = 0.;
-    let mut xprev: *mut ::core::ffi::c_double = 0 as *mut ::core::ffi::c_double;
-    let mut cgradtmp: *mut ::core::ffi::c_double = 0 as *mut ::core::ffi::c_double;
+    let mut xprev: *mut ::core::ffi::c_double = ::core::ptr::null_mut::<::core::ffi::c_double>();
+    let mut cgradtmp: *mut ::core::ffi::c_double = ::core::ptr::null_mut::<::core::ffi::c_double>();
     let mut mpi: ::core::ffi::c_int = mtot.wrapping_add(ptot) as ::core::ffi::c_int;
     let mut pi: ::core::ffi::c_int = ptot as ::core::ffi::c_int;
     let mut ni: ::core::ffi::c_int = n as ::core::ffi::c_int;
@@ -3646,7 +3721,7 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
     };
     let mut len_w: ::core::ffi::c_int = 0;
     let mut len_jw: ::core::ffi::c_int = 0;
-    let mut jw: *mut ::core::ffi::c_int = 0 as *mut ::core::ffi::c_int;
+    let mut jw: *mut ::core::ffi::c_int = ::core::ptr::null_mut::<::core::ffi::c_int>();
     let mut mode: ::core::ffi::c_int = 0 as ::core::ffi::c_int;
     let mut prev_mode: ::core::ffi::c_int = 0 as ::core::ffi::c_int;
     let mut acc: ::core::ffi::c_double = 0 as ::core::ffi::c_int as ::core::ffi::c_double;
@@ -3656,16 +3731,23 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
     let mut ret: nlopt_result = NLOPT_SUCCESS;
     let mut feasible: ::core::ffi::c_int = 0;
     let mut feasible_cur: ::core::ffi::c_int = 0;
-    let mut infeasibility: ::core::ffi::c_double = f64::INFINITY;
-    let mut infeasibility_cur: ::core::ffi::c_double = f64::INFINITY;
+    let mut infeasibility: ::core::ffi::c_double = ::core::f64::INFINITY;
+    let mut infeasibility_cur: ::core::ffi::c_double = ::core::f64::INFINITY;
     let mut max_cdim: ::core::ffi::c_uint = 0;
     let mut want_grad: ::core::ffi::c_int = 1 as ::core::ffi::c_int;
+    if ptot > n {
+        nlopt_stop_msg(
+            stop,
+            "slsqp: more equality constraints than variables"
+        );
+        return NLOPT_INVALID_ARGS;
+    }
     max_cdim = if nlopt_max_constraint_dim(m, fc) >= nlopt_max_constraint_dim(p, h) {
         nlopt_max_constraint_dim(m, fc)
     } else {
         nlopt_max_constraint_dim(p, h)
     };
-    length_work(&mut len_w, &mut len_jw, mpi, pi, ni);
+    length_work(&raw mut len_w, &raw mut len_jw, mpi, pi, ni);
     // work = malloc(
     //     (::std::mem::size_of::<::core::ffi::c_double>() as ::core::ffi::c_ulong)
     //         .wrapping_mul(
@@ -3705,11 +3787,13 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
     }
     cgrad = work;
     c = cgrad.offset(
-        (mpi1 as ::core::ffi::c_uint).wrapping_mul(n.wrapping_add(1 as ::core::ffi::c_int as ::core::ffi::c_uint))
+        (mpi1 as ::core::ffi::c_uint).wrapping_mul(n.wrapping_add(1 as ::core::ffi::c_uint))
             as isize,
     );
     grad = c.offset(mpi as isize);
-    xcur = grad.offset(n as isize).offset(1 as ::core::ffi::c_int as isize);
+    xcur = grad
+        .offset(n as isize)
+        .offset(1 as ::core::ffi::c_int as isize);
     xprev = xcur.offset(n as isize);
     cgradtmp = xprev.offset(n as isize);
     w = cgradtmp.offset(max_cdim.wrapping_mul(n) as isize);
@@ -3717,23 +3801,25 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
     memcpy(
         xcur as *mut ::core::ffi::c_void,
         x as *const ::core::ffi::c_void,
-        (::std::mem::size_of::<::core::ffi::c_double>() as ::core::ffi::c_ulong).wrapping_mul(n as ::core::ffi::c_ulong),
+        (::core::mem::size_of::<::core::ffi::c_double>() as size_t).wrapping_mul(n as size_t),
     );
     memcpy(
         xprev as *mut ::core::ffi::c_void,
         x as *const ::core::ffi::c_void,
-        (::std::mem::size_of::<::core::ffi::c_double>() as ::core::ffi::c_ulong).wrapping_mul(n as ::core::ffi::c_ulong),
+        (::core::mem::size_of::<::core::ffi::c_double>() as size_t).wrapping_mul(n as size_t),
     );
-    *minf = f64::INFINITY;
+    *minf = ::core::f64::INFINITY;
     fcur = *minf;
     fprev = fcur;
     feasible_cur = 0 as ::core::ffi::c_int;
     feasible = feasible_cur;
-    'c_6042: loop {
+    '_eval_f_and_grad: loop {
         want_grad = 1 as ::core::ffi::c_int;
-        's_146: loop {
-            let mut newgrad: *mut ::core::ffi::c_double = 0 as *mut ::core::ffi::c_double;
-            let mut newcgrad: *mut ::core::ffi::c_double = 0 as *mut ::core::ffi::c_double;
+        's_122: loop {
+            let mut newgrad: *mut ::core::ffi::c_double =
+                ::core::ptr::null_mut::<::core::ffi::c_double>();
+            let mut newcgrad: *mut ::core::ffi::c_double =
+                ::core::ptr::null_mut::<::core::ffi::c_double>();
             if want_grad != 0 {
                 newgrad = grad;
                 newcgrad = cgradtmp;
@@ -3741,17 +3827,16 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
             feasible_cur = 1 as ::core::ffi::c_int;
             infeasibility_cur = 0 as ::core::ffi::c_int as ::core::ffi::c_double;
             fcur = f.expect("non-null function pointer")(n, xcur, newgrad, f_data);
-            let ref mut fresh2 = *(*stop).nevals_p;
-            *fresh2 += 1;
+            *(*stop).nevals_p += 1;
             if nlopt_stop_forced(stop) != 0 {
-                fcur = f64::INFINITY;
+                fcur = ::core::f64::INFINITY;
                 ret = NLOPT_FORCED_STOP;
-                break 'c_6042;
+                break '_eval_f_and_grad;
             } else {
                 if nlopt_isfinite(fcur) != 0 {
                     want_grad = 0 as ::core::ffi::c_int;
-                    ii = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
-                    i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+                    ii = 0 as ::core::ffi::c_uint;
+                    i = 0 as ::core::ffi::c_uint;
                     while i < p {
                         let mut j: ::core::ffi::c_uint = 0;
                         let mut k: ::core::ffi::c_uint = 0;
@@ -3764,9 +3849,9 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
                         );
                         if nlopt_stop_forced(stop) != 0 {
                             ret = NLOPT_FORCED_STOP;
-                            break 'c_6042;
+                            break '_eval_f_and_grad;
                         } else {
-                            k = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+                            k = 0 as ::core::ffi::c_uint;
                             while k < (*h.offset(i as isize)).m {
                                 infeasibility_cur =
                                     if infeasibility_cur >= (*c.offset(ii as isize)).abs() {
@@ -3776,13 +3861,14 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
                                     };
                                 feasible_cur = (feasible_cur != 0
                                     && (*c.offset(ii as isize)).abs()
-                                        <= *((*h.offset(i as isize)).tol).offset(k as isize))
+                                        <= *(*h.offset(i as isize)).tol.offset(k as isize))
                                     as ::core::ffi::c_int;
                                 if !newcgrad.is_null() {
-                                    j = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+                                    j = 0 as ::core::ffi::c_uint;
                                     while j < n {
                                         *cgrad.offset(
-                                            j.wrapping_mul(mpi1 as ::core::ffi::c_uint).wrapping_add(ii)
+                                            j.wrapping_mul(mpi1 as ::core::ffi::c_uint)
+                                                .wrapping_add(ii)
                                                 as isize,
                                         ) = *cgradtmp
                                             .offset(k.wrapping_mul(n).wrapping_add(j) as isize);
@@ -3795,7 +3881,7 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
                             i = i.wrapping_add(1);
                         }
                     }
-                    i = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+                    i = 0 as ::core::ffi::c_uint;
                     while i < m {
                         let mut j_0: ::core::ffi::c_uint = 0;
                         let mut k_0: ::core::ffi::c_uint = 0;
@@ -3808,9 +3894,9 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
                         );
                         if nlopt_stop_forced(stop) != 0 {
                             ret = NLOPT_FORCED_STOP;
-                            break 'c_6042;
+                            break '_eval_f_and_grad;
                         } else {
-                            k_0 = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+                            k_0 = 0 as ::core::ffi::c_uint;
                             while k_0 < (*fc.offset(i as isize)).m {
                                 infeasibility_cur = if infeasibility_cur >= *c.offset(ii as isize) {
                                     infeasibility_cur
@@ -3819,13 +3905,14 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
                                 };
                                 feasible_cur = (feasible_cur != 0
                                     && *c.offset(ii as isize)
-                                        <= *((*fc.offset(i as isize)).tol).offset(k_0 as isize))
+                                        <= *(*fc.offset(i as isize)).tol.offset(k_0 as isize))
                                     as ::core::ffi::c_int;
                                 if !newcgrad.is_null() {
-                                    j_0 = 0 as ::core::ffi::c_int as ::core::ffi::c_uint;
+                                    j_0 = 0 as ::core::ffi::c_uint;
                                     while j_0 < n {
                                         *cgrad.offset(
-                                            j_0.wrapping_mul(mpi1 as ::core::ffi::c_uint).wrapping_add(ii)
+                                            j_0.wrapping_mul(mpi1 as ::core::ffi::c_uint)
+                                                .wrapping_add(ii)
                                                 as isize,
                                         ) = -*cgradtmp
                                             .offset(k_0.wrapping_mul(n).wrapping_add(j_0) as isize);
@@ -3852,12 +3939,12 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
                         memcpy(
                             x as *mut ::core::ffi::c_void,
                             xcur as *const ::core::ffi::c_void,
-                            (::std::mem::size_of::<::core::ffi::c_double>() as ::core::ffi::c_ulong)
-                                .wrapping_mul(n as ::core::ffi::c_ulong),
+                            (::core::mem::size_of::<::core::ffi::c_double>() as size_t)
+                                .wrapping_mul(n as size_t),
                         );
                     }
                     if mode == -(1 as ::core::ffi::c_int) {
-                        if nlopt_isinf(fprev) == 0 && feasible != 0 {
+                        if nlopt_isinf(fprev) == 0 && feasible_cur != 0 {
                             if nlopt_stop_ftol(stop, fcur, fprev) != 0 {
                                 ret = NLOPT_FTOL_REACHED;
                             } else if nlopt_stop_x(stop, xcur, xprev) != 0 {
@@ -3868,8 +3955,8 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
                         memcpy(
                             xprev as *mut ::core::ffi::c_void,
                             xcur as *const ::core::ffi::c_void,
-                            (::std::mem::size_of::<::core::ffi::c_double>() as ::core::ffi::c_ulong)
-                                .wrapping_mul(n as ::core::ffi::c_ulong),
+                            (::core::mem::size_of::<::core::ffi::c_double>() as size_t)
+                                .wrapping_mul(n as size_t),
                         );
                     }
                     if nlopt_stop_evals(stop) != 0 {
@@ -3880,43 +3967,43 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
                         ret = NLOPT_STOPVAL_REACHED;
                     }
                     if !(ret as ::core::ffi::c_int == NLOPT_SUCCESS as ::core::ffi::c_int) {
-                        break 'c_6042;
+                        break '_eval_f_and_grad;
                     }
                     slsqp(
-                        &mut mpi,
-                        &mut pi,
-                        &mut mpi1,
-                        &mut ni,
+                        &raw mut mpi,
+                        &raw mut pi,
+                        &raw mut mpi1,
+                        &raw mut ni,
                         xcur,
                         lb,
                         ub,
-                        &mut fcur,
+                        &raw mut fcur,
                         c,
                         grad,
                         cgrad,
-                        &mut acc,
-                        &mut iter,
-                        &mut mode,
+                        &raw mut acc,
+                        &raw mut iter,
+                        &raw mut mode,
                         w,
-                        &mut len_w,
+                        &raw mut len_w,
                         jw,
-                        &mut len_jw,
-                        &mut state,
+                        &raw mut len_jw,
+                        &raw mut state,
                     );
                     match mode {
                         -1 => {
                             if !(prev_mode == -(2 as ::core::ffi::c_int) && want_grad == 0) {
-                                continue 'c_6042;
+                                continue '_eval_f_and_grad;
                             }
                         }
                         -2 => {
-                            continue 'c_6042;
+                            continue '_eval_f_and_grad;
                         }
                         1 => {
                             break;
                         }
                         0 => {
-                            break 'c_6042;
+                            break '_eval_f_and_grad;
                         }
                         8 => {
                             ret = NLOPT_ROUNDOFF_LIMITED;
@@ -3924,9 +4011,12 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
                                 let mut save_ftol_rel: ::core::ffi::c_double = (*stop).ftol_rel;
                                 let mut save_xtol_rel: ::core::ffi::c_double = (*stop).xtol_rel;
                                 let mut save_ftol_abs: ::core::ffi::c_double = (*stop).ftol_abs;
-                                (*stop).ftol_rel *= 10 as ::core::ffi::c_int as ::core::ffi::c_double;
-                                (*stop).ftol_abs *= 10 as ::core::ffi::c_int as ::core::ffi::c_double;
-                                (*stop).xtol_rel *= 10 as ::core::ffi::c_int as ::core::ffi::c_double;
+                                (*stop).ftol_rel *=
+                                    10 as ::core::ffi::c_int as ::core::ffi::c_double;
+                                (*stop).ftol_abs *=
+                                    10 as ::core::ffi::c_int as ::core::ffi::c_double;
+                                (*stop).xtol_rel *=
+                                    10 as ::core::ffi::c_int as ::core::ffi::c_double;
                                 if nlopt_stop_ftol(stop, fcur, state.f0) != 0 {
                                     ret = NLOPT_FTOL_REACHED;
                                 } else if nlopt_stop_x(stop, xcur, state.x0) != 0 {
@@ -3936,36 +4026,38 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
                                 (*stop).ftol_abs = save_ftol_abs;
                                 (*stop).xtol_rel = save_xtol_rel;
                             }
-                            break 'c_6042;
+                            break '_eval_f_and_grad;
                         }
                         5 => {
-                            current_block = 9714366428826605325;
-                            break 's_146;
+                            current_block = 10253525168500281338;
+                            break 's_122;
                         }
                         6 | 7 => {
-                            current_block = 9714366428826605325;
-                            break 's_146;
+                            current_block = 10253525168500281338;
+                            break 's_122;
                         }
                         4 => {
-                            current_block = 8507021683849773288;
-                            break 's_146;
+                            current_block = 17546449896862090116;
+                            break 's_122;
                         }
                         3 | 9 => {
-                            current_block = 8507021683849773288;
-                            break 's_146;
+                            current_block = 17546449896862090116;
+                            break 's_122;
                         }
-                        // 2 |
-                        _ => {
-                            nlopt_stop_msg(stop, "bug: workspace is too small");
+                        2 | _ => {
+                            nlopt_stop_msg(
+                                stop,
+                                "bug: workspace is too small"
+                            );
                             ret = NLOPT_INVALID_ARGS;
-                            break 'c_6042;
+                            break '_eval_f_and_grad;
                         }
                     }
                 }
             }
         }
         match current_block {
-            9714366428826605325 => {
+            10253525168500281338 => {
                 ret = NLOPT_ROUNDOFF_LIMITED;
                 break;
             }
@@ -3982,20 +4074,20 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
             memcpy(
                 x as *mut ::core::ffi::c_void,
                 xprev as *const ::core::ffi::c_void,
-                (::std::mem::size_of::<::core::ffi::c_double>() as ::core::ffi::c_ulong)
-                    .wrapping_mul(n as ::core::ffi::c_ulong),
+                (::core::mem::size_of::<::core::ffi::c_double>() as size_t)
+                    .wrapping_mul(n as size_t),
             );
         } else {
             *minf = fcur;
             memcpy(
                 x as *mut ::core::ffi::c_void,
                 xcur as *const ::core::ffi::c_void,
-                (::std::mem::size_of::<::core::ffi::c_double>() as ::core::ffi::c_ulong)
-                    .wrapping_mul(n as ::core::ffi::c_ulong),
+                (::core::mem::size_of::<::core::ffi::c_double>() as size_t)
+                    .wrapping_mul(n as size_t),
             );
         }
     }
     // free(work as *mut ::core::ffi::c_void);
     let _ = Box::from_raw(work);
     return ret;
-}}
+}
