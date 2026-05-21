@@ -142,10 +142,10 @@ pub fn minimize<F: Func<U>, G: Func<U>, U: Clone>(
     maxeval: usize,
     stop_tol: Option<StopTols>,
 ) -> Result<SuccessOutcome, FailOutcome> {
-    let fn_cfg = Box::new(NLoptFunctionCfg {
+    let fn_cfg = NLoptFunctionCfg {
         objective_fn: func,
         user_data: args.clone(),
-    });
+    };
     // Take a pointer to the stack allocation.
     let fn_cfg_ptr = &fn_cfg as *const _ as *mut c_void;
 
@@ -243,12 +243,6 @@ pub fn minimize<F: Func<U>, G: Func<U>, U: Clone>(
             &mut minf,
             &mut stop,
         )
-    };
-
-    // Convert the raw pointer back into a Box with the B::from_raw function,
-    // allowing the Box destructor to perform the cleanup.
-    unsafe {
-        let _ = Box::from_raw(fn_cfg_ptr as *mut NLoptFunctionCfg<F, U>);
     };
 
     match status {
