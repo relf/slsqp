@@ -146,28 +146,33 @@ pub fn minimize<F: Func<U>, G: Func<U>, U: Clone>(
         objective_fn: func,
         user_data: args.clone(),
     });
-    let fn_cfg_ptr = Box::into_raw(fn_cfg) as *mut c_void;
+    // Take a pointer to the stack allocation.
+    let fn_cfg_ptr = &fn_cfg as *const _ as *mut c_void;
+
     let mut cstr_tol = 0.0; // no cstr tolerance
 
-    let mut cstr_cfg = cons
-        .iter()
-        .map(|c| {
-            let c_cfg = Box::new(NLoptConstraintCfg {
-                constraint_fn: c as &dyn Func<U>,
-                user_data: args.clone(),
-            });
-            let c_cfg_ptr = Box::into_raw(c_cfg) as *mut c_void;
-
-            nlopt_constraint {
-                m: 1,
-                f: Some(nlopt_constraint_raw_callback::<F, U>),
-                pre: None,
-                mf: None,
-                f_data: c_cfg_ptr,
-                tol: &mut cstr_tol,
-            }
-        })
-        .collect::<Vec<_>>();
+    // Allocate the data for the constraints.
+    let mut cstr_data = Vec::with_capacity(cons.len());
+    for c in cons {
+        cstr_data.push(NLoptConstraintCfg {
+            constraint_fn: c as &dyn Func<U>,
+            user_data: args.clone(),
+        });
+    }
+    // Allocate the constraint configs.
+    let mut cstr_cfg = Vec::with_capacity(cons.len());
+    for c in &cstr_data {
+        cstr_cfg.push(nlopt_constraint {
+            m: 1,
+            f: Some(nlopt_constraint_raw_callback::<F, U>),
+            pre: None,
+            mf: None,
+            // We can take a pointer to the constraint data as the
+            // vec is not modified after this point.
+            f_data: c as *const _ as *mut c_void,
+            tol: &mut cstr_tol,
+        });
+    }
 
     let mut x = vec![0.; xinit.len()];
     x.copy_from_slice(xinit);
@@ -372,14 +377,17 @@ mod tests {
             &[(-10., 10.), (-10., 10.)],
             &cons,
             (),
-            200,
+            100,
             Some(stop_tol),
         ) {
             Ok((_, x, _)) => {
+                println!("x_opt = {:?}", x);
                 let exp = [0., 0.];
                 for (act, exp) in x.iter().zip(exp.iter()) {
                     assert_abs_diff_eq!(act, exp, epsilon = 1e-3);
                 }
+                // check feasibility
+                assert!(x[0] >= 0.);
             }
             Err((status, _, _)) => {
                 panic!("{}", format!("Error status : {:?}", status));
