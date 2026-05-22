@@ -1,6 +1,9 @@
 # Changelog
 
-## [Unreleased]
+## [1.0.1] - 2026-05-26
+
+* Regenerate slsqp.rs code from nlopt 2.10.1 slsqp C code with [c2rust 0.22.1](https://github.com/immunant/c2rust).
+  Note: previous manual edits where re-introduced and libc dependency is removed
 
 ## [1.0.0] - 2026-01-14
 
