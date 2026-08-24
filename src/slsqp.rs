@@ -655,9 +655,8 @@ unsafe fn nlopt_compute_rescaling(
     //     (::std::mem::size_of::<::core::ffi::c_double>() as ::core::ffi::c_ulong).wrapping_mul(n as ::core::ffi::c_ulong),
     // ) as *mut ::core::ffi::c_double;
 
-    let mut space: Box<Vec<::core::ffi::c_double>> = Box::new(vec![0.; usize::try_from(n).unwrap()]);
-    let s = space.as_mut_ptr() as *mut ::core::ffi::c_double;
-    std::mem::forget(space);
+    let space = vec![0.; usize::try_from(n).unwrap()].into_boxed_slice();
+    let s = Box::into_raw(space) as *mut ::core::ffi::c_double;
 
     let mut i: ::core::ffi::c_uint = 0;
     if s.is_null() {
@@ -741,9 +740,8 @@ unsafe fn nlopt_new_rescaled(
     //     (::std::mem::size_of::<::core::ffi::c_double>() as ::core::ffi::c_ulong).wrapping_mul(n as ::core::ffi::c_ulong),
     // ) as *mut ::core::ffi::c_double;
 
-    let mut space: Box<Vec<::core::ffi::c_double>> = Box::new(vec![0.; usize::try_from(n).unwrap()]);
-    let xs = space.as_mut_ptr() as *mut ::core::ffi::c_double;
-    std::mem::forget(space);
+    let space = vec![0.; usize::try_from(n).unwrap()].into_boxed_slice();
+    let xs = Box::into_raw(space) as *mut ::core::ffi::c_double;
 
     if xs.is_null() {
         return ::core::ptr::null_mut::<::core::ffi::c_double>();
@@ -3777,10 +3775,8 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
         .wrapping_add(max_cdim.wrapping_mul(n))
         .wrapping_add(len_w as ::core::ffi::c_uint)
         .wrapping_add(len_jw as ::core::ffi::c_uint); // size_of(::core::ffi::c_double) > size_of(::core::ffi::c_int)
-    let mut space: Box<Vec<::core::ffi::c_double>> =
-        Box::new(vec![0.; usize::try_from(space_size).unwrap()]);
-    work = space.as_mut_ptr() as *mut ::core::ffi::c_double;
-    std::mem::forget(space);
+    let mut space: Vec<::core::ffi::c_double> = vec![0.; usize::try_from(space_size).unwrap()];
+    work = space.as_mut_ptr();
 
     if work.is_null() {
         return NLOPT_OUT_OF_MEMORY;
@@ -4087,7 +4083,6 @@ pub(crate) unsafe fn nlopt_slsqp<U>(
             );
         }
     }
-    // free(work as *mut ::core::ffi::c_void);
-    let _ = Box::from_raw(work);
+    // `space` (the buffer behind `work`) is dropped here.
     return ret;
 }
