@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.0.2] - 2026-08-26
+
+*  Fix per-call memory leak of the work buffer's Vec header in `minimize`
+
 ## [1.0.1] - 2026-05-26
 
 * Regenerate slsqp.rs code from nlopt 2.10.1 slsqp C code with [c2rust 0.22.1](https://github.com/immunant/c2rust).
