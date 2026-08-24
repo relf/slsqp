@@ -655,9 +655,8 @@ unsafe fn nlopt_compute_rescaling(
     //     (::std::mem::size_of::<::core::ffi::c_double>() as ::core::ffi::c_ulong).wrapping_mul(n as ::core::ffi::c_ulong),
     // ) as *mut ::core::ffi::c_double;
 
-    let mut space: Box<Vec<::core::ffi::c_double>> = Box::new(vec![0.; usize::try_from(n).unwrap()]);
-    let s = space.as_mut_ptr() as *mut ::core::ffi::c_double;
-    std::mem::forget(space);
+    let space = vec![0.; usize::try_from(n).unwrap()].into_boxed_slice();
+    let s = Box::into_raw(space) as *mut ::core::ffi::c_double;
 
     let mut i: ::core::ffi::c_uint = 0;
     if s.is_null() {
@@ -741,9 +740,8 @@ unsafe fn nlopt_new_rescaled(
     //     (::std::mem::size_of::<::core::ffi::c_double>() as ::core::ffi::c_ulong).wrapping_mul(n as ::core::ffi::c_ulong),
     // ) as *mut ::core::ffi::c_double;
 
-    let mut space: Box<Vec<::core::ffi::c_double>> = Box::new(vec![0.; usize::try_from(n).unwrap()]);
-    let xs = space.as_mut_ptr() as *mut ::core::ffi::c_double;
-    std::mem::forget(space);
+    let space = vec![0.; usize::try_from(n).unwrap()].into_boxed_slice();
+    let xs = Box::into_raw(space) as *mut ::core::ffi::c_double;
 
     if xs.is_null() {
         return ::core::ptr::null_mut::<::core::ffi::c_double>();
